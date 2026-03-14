@@ -1,10 +1,12 @@
 import DashboardClient from "./DashboardClient"
 import { prisma } from "@/lib/prisma"
+import { getCurrentUser } from "@/lib/auth"
 
 export const dynamic = 'force-dynamic'
 
-// We are defining userId here as "test-user-id" to match the API simulation
 export default async function DashboardPage() {
+  const user = await getCurrentUser()
+
   const palaces = await prisma.palace.findMany({
     where: { userId: "test-user-id" },
     include: {
@@ -19,5 +21,5 @@ export default async function DashboardPage() {
     orderBy: { createdAt: 'desc' }
   })
 
-  return <DashboardClient initialPalaces={palaces} />
+  return <DashboardClient initialPalaces={palaces} userEmail={user?.email ?? null} />
 }

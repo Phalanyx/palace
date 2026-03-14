@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, ImageIcon, Pencil, Calendar, Home, FolderOpen, BookOpen } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, ImageIcon, Pencil, Calendar, Home, FolderOpen, BookOpen, LogOut } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import DragonSceneLoader from "../components/DragonSceneLoader"
 
 // ─── Color palette (warm zinc + blue, Notion/Arc-inspired) ───────────────────
@@ -156,7 +158,65 @@ const PROMPTS = [
 
 const FILTER_TABS = ["ALL", "STYLE", "THEME", "STRUCTURE", "LEARNING METHOD"]
 
-export default function DashboardClient({ initialPalaces }: { initialPalaces: Palace[] }) {
+function AvatarMenu({ initials, email }: { initials: string, email: string | null }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.replace("/")
+    router.refresh()
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-9 h-9 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white hover:bg-white/30 transition-colors"
+      >
+        {initials}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-12 w-56 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl p-3 shadow-2xl z-50">
+          {email && (
+            <div className="px-2 py-1.5 mb-2">
+              <p className="text-white/40 text-xs truncate">{email}</p>
+            </div>
+          )}
+          <div className="h-px bg-white/10 mb-2" />
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function getInitials(email: string | null) {
+  if (!email) return "?"
+  const local = email.split("@")[0]
+  const parts = local.split(/[._-]/)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return local.slice(0, 2).toUpperCase()
+}
+
+export default function DashboardClient({ initialPalaces, userEmail }: { initialPalaces: Palace[], userEmail: string | null }) {
   const [palaces, setPalaces] = useState(initialPalaces)
   const [inputText, setInputText] = useState("")
   const [activeFilter, setActiveFilter] = useState("ALL")
@@ -181,7 +241,7 @@ export default function DashboardClient({ initialPalaces }: { initialPalaces: Pa
             </button>
           ))}
         </div>
-        <div className="w-9 h-9 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white">JD</div>
+        <AvatarMenu initials={getInitials(userEmail)} email={userEmail} />
       </nav>
 
       {/* Hero with dragon scene background */}

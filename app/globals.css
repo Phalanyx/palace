@@ -17,4 +17,14 @@
     background-color: #0d0d10;
     color: #ffffff;
   }
+
+  /* Keep glass inputs frosted when focused or autofilled */
+  .glass-input:-webkit-autofill,
+  .glass-input:-webkit-autofill:hover,
+  .glass-input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px rgba(255, 255, 255, 0.2) inset;
+    -webkit-text-fill-color: white;
+    caret-color: white;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
