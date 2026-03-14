@@ -171,6 +171,18 @@ export default function PalaceRoomView({
   // Reset open objects when room changes
   useEffect(() => { setOpenObjectIds(new Set()); }, [activeRoomIdx]);
 
+  const handleNavigate = useCallback((roomIndex: number, objectIndex: number) => {
+    console.log('[NAV] onNavigate called:', { roomIndex, objectIndex });
+    setActiveRoomIdx(prev => {
+      if (prev === roomIndex) {
+        setActiveObjectIdx(objectIndex);
+        return prev;
+      }
+      pendingObjectIdxRef.current = objectIndex;
+      return roomIndex;
+    });
+  }, []);
+
   const handleObjectOpen = (id: string) => {
     // Only one object description open at a time
     setOpenObjectIds(new Set([id]));
@@ -546,19 +558,7 @@ export default function PalaceRoomView({
           isTestMode={false}
           currentTestQuestion={undefined}
           rooms={rooms}
-          onNavigate={useCallback((roomIndex: number, objectIndex: number) => {
-            console.log('[NAV] onNavigate called:', { roomIndex, objectIndex });
-            setActiveRoomIdx(prev => {
-              if (prev === roomIndex) {
-                // Same room — set object directly
-                setActiveObjectIdx(objectIndex);
-                return prev;
-              }
-              // Different room — stash object for the effect
-              pendingObjectIdxRef.current = objectIndex;
-              return roomIndex;
-            });
-          }, [])}
+          onNavigate={handleNavigate}
         />
       )}
     </div>
