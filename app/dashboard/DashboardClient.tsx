@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import DragonSceneLoader from "../components/DragonSceneLoader"
+import { PROMPT_LIBRARY, PROMPT_CATEGORIES } from "@/lib/promptLibrary"
 
 // ─── Color palette (warm zinc + blue, Notion/Arc-inspired) ───────────────────
 // bg:          #f7f7f5  warm off-white
@@ -71,11 +72,11 @@ function RetentionRing({ pct }: { pct: number }) {
 
 function RoomBlocks({ count }: { count: number }) {
   return (
-    <div className="flex items-center gap-2 text-white/40 text-xs font-mono">
-      <span>Rooms: {String(count).padStart(2, '0')}</span>
-      <div className="flex gap-0.5">
+    <div className="flex items-center gap-2 text-white/30 text-[10px] font-medium tracking-wide uppercase">
+      <span>{count} {count === 1 ? 'room' : 'rooms'}</span>
+      <div className="flex gap-1">
         {[0,1,2,3].map(i => (
-          <div key={i} className={`w-2 h-2 ${i < Math.min(count, 4) ? 'bg-[#60a5fa]' : 'border border-white/10'}`} />
+          <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < Math.min(count, 4) ? 'bg-white/50' : 'bg-white/10'}`} />
         ))}
       </div>
     </div>
@@ -93,7 +94,7 @@ function PalaceCard({ palace }: { palace: Palace }) {
     : 'Low Stability'
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col hover:border-white/20 hover:bg-white/8 transition-all">
+    <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-2xl overflow-hidden flex flex-col hover:border-white/30 hover:bg-white/15 transition-all shadow-lg shadow-black/20">
       {/* Cover image */}
       <div className="relative h-36 w-full overflow-hidden bg-white/5">
         {palace.coverImageUrl ? (
@@ -115,7 +116,7 @@ function PalaceCard({ palace }: { palace: Palace }) {
       </div>
       <div className="px-4 pb-4 flex-1 flex flex-col">
         <h3 className="text-lg font-bold text-white mt-2 mb-1 leading-snug">{palace.title}</h3>
-        <p className="text-white/50 text-sm line-clamp-2 leading-relaxed">{palace.prompt}</p>
+        <p className="text-white/50 text-sm line-clamp-3 leading-relaxed flex-1">{palace.prompt}</p>
         <div className="border-t border-dashed border-white/10 my-4" />
         {isError ? (
           <div className="flex items-center justify-between">
@@ -129,33 +130,24 @@ function PalaceCard({ palace }: { palace: Palace }) {
         ) : isProcessing ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {score !== undefined && <RetentionRing pct={score} />}
-              <div>
-                <div className="text-white/30 text-[9px] font-bold tracking-widest uppercase mb-0.5">Retention</div>
-                <div className="text-white/60 text-sm font-medium">Loading...</div>
-              </div>
+              <Lock className="w-4 h-4 text-white/20" />
+              <span className="text-white/40 text-sm">Building...</span>
             </div>
-            <Lock className="w-4 h-4 text-white/20" />
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {score !== undefined ? (
-                <>
-                  <RetentionRing pct={score} />
-                  <div>
-                    <div className="text-white/30 text-[9px] font-bold tracking-widest uppercase mb-0.5">Retention</div>
-                    <div className="text-white text-sm font-semibold">{stabilityLabel}</div>
-                  </div>
-                </>
-              ) : (
+            {score !== undefined ? (
+              <div className="flex items-center gap-3">
+                <RetentionRing pct={score} />
                 <div>
                   <div className="text-white/30 text-[9px] font-bold tracking-widest uppercase mb-0.5">Retention</div>
-                  <div className="text-white/30 text-sm">Not tested yet</div>
+                  <div className="text-white text-sm font-semibold">{stabilityLabel}</div>
                 </div>
-              )}
-            </div>
-            <Link href={`/palace/${palace.id}`} className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-white/60 hover:bg-white/10 hover:text-white transition-colors">
+              </div>
+            ) : (
+              <div />
+            )}
+            <Link href={`/palace/${palace.id}`} className="w-8 h-8 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white/60 hover:bg-white/15 hover:text-white transition-colors">
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -165,14 +157,7 @@ function PalaceCard({ palace }: { palace: Palace }) {
   )
 }
 
-const PROMPTS = [
-  { title: "The Grand Library", desc: "Classic wood-paneled halls for literature and philosophy.", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80" },
-  { title: "Neo-Tokyo Grid", desc: "Cyberpunk neon landmarks for technology and coding.", img: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&q=80" },
-  { title: "Quantum Void", desc: "Infinite cosmic vacuum for abstract physics concepts.", img: "https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=400&q=80" },
-  { title: "Bauhaus Pavilion", desc: "Minimal geometric volumes for systematic logic.", img: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&q=80" },
-]
-
-const FILTER_TABS = ["ALL", "STYLE", "THEME", "STRUCTURE", "LEARNING METHOD"]
+const FILTER_TABS = ["All", ...PROMPT_CATEGORIES] as const
 
 function AvatarMenu({ initials, email }: { initials: string, email: string | null }) {
   const [open, setOpen] = useState(false)
@@ -198,7 +183,7 @@ function AvatarMenu({ initials, email }: { initials: string, email: string | nul
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-9 h-9 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white hover:bg-white/30 transition-colors"
+        className="w-12 h-12 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white hover:bg-white/30 transition-colors"
       >
         {initials}
       </button>
@@ -235,21 +220,29 @@ function getInitials(email: string | null) {
 export default function DashboardClient({ initialPalaces, userEmail }: { initialPalaces: Palace[], userEmail: string | null }) {
   const [palaces, setPalaces] = useState(initialPalaces)
   const [inputText, setInputText] = useState("")
-  const [activeFilter, setActiveFilter] = useState("ALL")
+  const [activeFilter, setActiveFilter] = useState("All")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
-  const recentPalacesRef = useRef<HTMLDivElement>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [generatingPromptId, setGeneratingPromptId] = useState<string | null>(null)
+  const recentPalacesRef = useRef<HTMLHeadingElement>(null)
+  const promptLibraryRef = useRef<HTMLHeadingElement>(null)
 
-  async function handleGenerate() {
-    if (!inputText.trim() || isGenerating) return
-    setIsGenerating(true)
+  const filteredPrompts = PROMPT_LIBRARY.filter(p => {
+    const matchesCategory = activeFilter === "All" || p.category === activeFilter
+    const q = searchQuery.toLowerCase()
+    const matchesSearch = !q || p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+    return matchesCategory && matchesSearch
+  })
+
+  async function generatePalace(promptText: string, files: File[] = []) {
     setGenerateError(null)
     try {
       const formData = new FormData()
-      formData.append('prompt', inputText)
-      attachedFiles.forEach(f => formData.append('files', f))
+      formData.append('prompt', promptText)
+      files.forEach(f => formData.append('files', f))
       const res = await fetch('/api/palaces/generate', {
         method: 'POST',
         body: formData,
@@ -269,15 +262,33 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
         _count: { rooms: 0 },
         testSessions: [],
       }, ...prev])
-      setInputText("")
-      setAttachedFiles([])
       setTimeout(() => {
         recentPalacesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 100)
     } catch {
       setGenerateError('Network error — please try again')
+    }
+  }
+
+  async function handleGenerate() {
+    if (!inputText.trim() || isGenerating) return
+    setIsGenerating(true)
+    try {
+      await generatePalace(inputText, attachedFiles)
+      setInputText("")
+      setAttachedFiles([])
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  async function handleUsePrompt(p: typeof PROMPT_LIBRARY[number]) {
+    if (generatingPromptId) return
+    setGeneratingPromptId(p.id)
+    try {
+      await generatePalace(p.prompt)
+    } finally {
+      setGeneratingPromptId(null)
     }
   }
 
@@ -287,18 +298,18 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
       <nav className="grid grid-cols-3 items-center px-6 py-4 absolute top-0 inset-x-0 z-20">
         <div className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/palace_logo.png" alt="Palace" className="h-20 w-auto" />
+          <img src="/palace_logo.png" alt="Palace" className="h-20 w-auto mt-2" />
         </div>
         <div className="flex items-center justify-self-center bg-white/10 border border-white/20 rounded-full px-1 py-1 gap-1 backdrop-blur-sm">
-          {[
-            { label: "Home", icon: <Home className="w-3.5 h-3.5" />, active: true },
-            { label: "Projects", icon: <FolderOpen className="w-3.5 h-3.5" /> },
-            { label: "Prompt Library", icon: <BookOpen className="w-3.5 h-3.5" /> },
-          ].map(({ label, icon, active }) => (
-            <button key={label} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${active ? 'bg-white/20 text-white shadow-sm' : 'text-white/60 hover:text-white'}`}>
-              {icon}{label}
-            </button>
-          ))}
+          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors bg-white/20 text-white shadow-sm">
+            <Home className="w-3.5 h-3.5" />Home
+          </button>
+          <button onClick={() => recentPalacesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors text-white/60 hover:text-white">
+            <FolderOpen className="w-3.5 h-3.5" />Projects
+          </button>
+          <button onClick={() => promptLibraryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors text-white/60 hover:text-white">
+            <BookOpen className="w-3.5 h-3.5" />Prompt Library
+          </button>
         </div>
         <div className="justify-self-end">
           <AvatarMenu initials={getInitials(userEmail)} email={userEmail} />
@@ -390,14 +401,19 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
       {/* Discover Prompts */}
       <div className="max-w-7xl mx-auto px-6 pb-20">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-black text-white tracking-widest uppercase">Discover Palace Prompts</h2>
+          <h2 ref={promptLibraryRef} className="text-2xl font-bold text-white scroll-mt-6">Discover Palace Prompts</h2>
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 w-64">
             <Search className="w-4 h-4 text-white/30" />
-            <input placeholder="Search prompts..." className="bg-transparent text-sm text-white placeholder-white/30 outline-none flex-1" />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search prompts..."
+              className="bg-transparent text-sm text-white placeholder-white/30 outline-none flex-1"
+            />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 mb-8 flex-wrap">
           {FILTER_TABS.map(tab => (
             <button
               key={tab}
@@ -409,26 +425,45 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
           ))}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {PROMPTS.map(p => (
-            <div key={p.title} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 hover:bg-white/8 transition-all group">
-              <div className="relative h-44 overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.img} alt={p.title} className="w-full h-full object-cover opacity-50 group-hover:opacity-65 transition-opacity" />
-              </div>
-              <div className="p-4">
-                <div className="text-white font-black text-sm tracking-wider uppercase mb-1">{p.title}</div>
-                <div className="text-white/40 text-[10px] font-bold tracking-widest uppercase leading-relaxed mb-4">{p.desc}</div>
-                <button
-                  onClick={() => { setInputText(`Create a palace inspired by: ${p.title}. ${p.desc}`); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 border border-white/10 rounded-xl text-sm text-white hover:bg-white/15 transition-colors font-medium"
-                >
-                  + Use Prompt
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        {filteredPrompts.length === 0 ? (
+          <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl text-white/30">
+            No prompts match your search. Try a different query or category.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {filteredPrompts.map(p => {
+              const isCardGenerating = generatingPromptId === p.id
+              return (
+                <div key={p.id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 hover:bg-white/[0.08] transition-all group">
+                  <div className="relative h-44 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.coverImage} alt={p.title} className="w-full h-full object-cover opacity-50 group-hover:opacity-65 transition-opacity" />
+                    <div className="absolute top-3 left-3">
+                      <span className="px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm border border-white/10 text-[10px] font-bold tracking-widest uppercase text-white/70">
+                        {p.category}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="text-white font-black text-sm tracking-wider uppercase mb-1">{p.title}</div>
+                    <div className="text-white/40 text-[10px] font-bold tracking-widest uppercase leading-relaxed mb-4">{p.description}</div>
+                    <button
+                      onClick={() => handleUsePrompt(p)}
+                      disabled={!!generatingPromptId}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 border border-white/10 rounded-xl text-sm text-white hover:bg-white/15 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isCardGenerating ? (
+                        <><RotateCw className="w-4 h-4 animate-spin" /> Generating...</>
+                      ) : (
+                        '+ Use Prompt'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {showCreateModal && (

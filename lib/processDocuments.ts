@@ -63,9 +63,12 @@ async function generateAndSaveCoverImage(
   const supabase = createClient(supabaseUrl, supabaseKey)
 
   const imagePrompt =
-    `A stunning low-poly 3D landscape scene representing "${title}": ${prompt}. ` +
-    `Geometric faceted polygons, vivid complementary colors, dramatic rim lighting, ` +
-    `isometric fantasy atmosphere. Ultra-clean minimalist composition, no text, no labels.`
+    `Low-poly 3D render of a scene about "${title}". ` +
+    `Show iconic objects and environments unique to this subject — NOT a generic landscape or campsite. ` +
+    `Faceted geometric polygons, flat-shaded triangulated faces. ` +
+    `Use these colors: forest green, moss green, deep teal, muted sand, stone gray, muted purple, warm orange, amber yellow, frost teal, deep cyan, olive, soft red, and slate blue. ` +
+    `Soft dramatic lighting, clean composition. ` +
+    `ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO LABELS, NO WRITING of any kind anywhere in the image.`
 
   const result = await ai.models.generateImages({
     model: 'imagen-4.0-generate-001',
