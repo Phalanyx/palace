@@ -1,6 +1,6 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-nova",
+  "style": "base-nova",
   "rsc": true,
   "tsx": true,
   "tailwind": {
@@ -12,6 +12,8 @@
   },
   "iconLibrary": "lucide",
   "rtl": false,
+  "menuColor": "default",
+  "menuAccent": "subtle",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",

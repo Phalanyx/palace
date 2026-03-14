@@ -59,7 +59,7 @@
   --glass-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.15), 0 4px 16px rgba(0, 0, 0, 0.1);
   --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
   --gradient: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
-  
+
   /* Frosted glass variant - Enhanced opacity and stronger blur */
   --glass-frosted-bg: linear-gradient(135deg, 
     rgba(255, 255, 255, 0.25) 0%, 
@@ -75,7 +75,7 @@
     0 0 0 0.5px rgba(255, 255, 255, 0.15) inset,
     0 0 20px rgba(255, 255, 255, 0.18) inset;
   --blur-frosted: 25px;
-  
+
   /* Fluted glass variant - Vertical ridges pattern */
   --glass-fluted-pattern: repeating-linear-gradient(
     90deg,
@@ -85,7 +85,7 @@
     rgba(255, 255, 255, 0.02) 10px,
     rgba(255, 255, 255, 0.08) 12px
   );
-  
+
   /* Crystal glass variant - Clear glass with highlights and glow */
   --glass-crystal-bg: rgba(255, 255, 255, 0.3);
   --glass-crystal-border: rgba(255, 255, 255, 0.3);
@@ -96,9 +96,6 @@
     0 0 25px rgba(0, 0, 0, 0.3),
     0 0 35px rgba(255, 255, 255, 0.15);
   --blur-crystal: 2px;
-
-
-
 
   /* Page-level glass */
   --glass-page-bg: rgba(0, 0, 0, 0.6);
@@ -150,7 +147,7 @@
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
   --glass-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
   --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
-  
+
   /* Frosted glass variant - Enhanced opacity and stronger blur for dark mode */
   --glass-frosted-bg: linear-gradient(135deg, 
     rgba(255, 255, 255, 0.15) 0%, 
@@ -165,7 +162,7 @@
     0 2px 8px rgba(0, 0, 0, 0.3),
     0 0 0 0.5px rgba(255, 255, 255, 0.2) inset,
     0 0 20px rgba(255, 255, 255, 0.22) inset;
-  
+
   /* Fluted glass variant - Vertical ridges pattern for dark mode */
   --glass-fluted-pattern: repeating-linear-gradient(
     90deg,
@@ -175,7 +172,7 @@
     rgba(255, 255, 255, 0.01) 10px,
     rgba(255, 255, 255, 0.05) 12px
   );
-  
+
   /* Crystal glass variant - Clear glass with highlights and glow for dark mode */
   --glass-crystal-bg: rgba(255, 255, 255, 0.1);
   --glass-crystal-border: rgba(255, 255, 255, 0.3);
@@ -185,10 +182,6 @@
   --glass-crystal-shadow-hover: 
     0 0 25px rgba(0, 0, 0, 0.5),
     0 0 35px rgba(255, 255, 255, 0.2);
-
-
-
-
 
   /* Page-level glass */
   --glass-page-bg: rgba(0, 0, 0, 0.75);
@@ -233,14 +226,13 @@
     @apply border-border outline-ring/50;
   }
   body {
-     @apply text-foreground;
+     @apply bg-background text-foreground;
     background-color: transparent;
   }
   html {
     @apply font-sans;
   }
 }
-
 
 /* Glass UI Utilities */
 
