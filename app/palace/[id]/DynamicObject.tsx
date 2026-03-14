@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
+import { extractMeshCode } from '@/lib/extractMeshCode';
 
 interface DynamicObjectProps {
   objectData: {
@@ -49,8 +50,12 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
     // Prefer the proper Mesh DB relation, fall back to legacy metadata
     let meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
 
-    const buildMeshFromCode = (code: string) => {
+    const buildMeshFromCode = (raw: string) => {
       try {
+        // Detect HTML and extract JS, or pass through raw JS (legacy .js files)
+        const code = (raw.includes('<script') || raw.includes('<!DOCTYPE') || raw.includes('<html'))
+          ? extractMeshCode(raw)
+          : raw;
         const createMeshFn = new Function('THREE', code);
         const obj = createMeshFn(THREE);
         if (!obj) throw new Error("No object returned.");
