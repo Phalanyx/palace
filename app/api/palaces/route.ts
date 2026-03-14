@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
+import { requireApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadDocument } from '@/lib/storage'
 import { processDocuments } from '@/lib/processDocuments'
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireApiUser()
+    if (!auth.user) {
+      return auth.response
+    }
+
     const formData = await request.formData()
     const title = formData.get('title') as string
     const prompt = formData.get('prompt') as string
@@ -14,13 +20,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // 1. Create Palace Row
-    // TODO: Connect this to actual auth if Supabase Auth is implemented. Hardcoding test userId for hackathon speed
-    const userId = "test-user-id" 
-    
     const palace = await prisma.palace.create({
       data: {
-        userId,
+        userId: auth.user.id,
         title,
         prompt,
         status: 'processing'
@@ -56,13 +58,15 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Hardcoded user ID for hackathon speed
-    const userId = "test-user-id"
+    const auth = await requireApiUser()
+    if (!auth.user) {
+      return auth.response
+    }
     
     const palaces = await prisma.palace.findMany({
-      where: { userId },
+      where: { userId: auth.user.id },
       include: {
         _count: {
           select: { rooms: true }

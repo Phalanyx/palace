@@ -1,14 +1,19 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { requireUser } from '@/lib/auth';
 import PalaceRoomView from './PalaceRoomView';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PalacePage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
+  const user = await requireUser();
 
-  const palace = await prisma.palace.findUnique({
-    where: { id: params.id },
+  const palace = await prisma.palace.findFirst({
+    where: {
+      id: params.id,
+      userId: user.id,
+    },
     include: {
       rooms: {
         orderBy: { orderIndex: 'asc' },
@@ -27,11 +32,11 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
 
   if (!palace) notFound();
 
-  const roomsData = palace.rooms.map((room: any) => ({
+  const roomsData = palace.rooms.map((room) => ({
     id: room.id,
     roomKey: room.roomKey,
     orderIndex: room.orderIndex,
-    objects: room.objects.map((obj: any) => ({
+    objects: room.objects.map((obj) => ({
       id: obj.id,
       label: obj.label,
       description: obj.description,
