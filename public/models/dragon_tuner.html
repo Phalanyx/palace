@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a12; overflow: hidden; }
+canvas { display: block; }
+#hud {
+  position: fixed; top: 14px; left: 14px;
+  background: rgba(0,0,0,0.75); color: #00ff88;
+  font-family: monospace; font-size: 13px;
+  padding: 10px 14px; border-radius: 8px;
+  line-height: 1.8; pointer-events: none;
+  border: 1px solid rgba(0,255,136,0.2);
+}
+#hud span { color: #fff; }
+#info {
+  position: fixed; bottom: 14px; left: 50%;
+  transform: translateX(-50%);
+  color: #666; font-family: monospace; font-size: 12px;
+}
+#copy {
+  position: fixed; top: 14px; right: 14px;
+  background: #1a1a2e; color: #00ff88;
+  font-family: monospace; font-size: 12px;
+  padding: 8px 14px; border-radius: 6px;
+  border: 1px solid rgba(0,255,136,0.3);
+  cursor: pointer;
+}
+#copy:hover { background: #252540; }
+#copied {
+  position: fixed; top: 54px; right: 14px;
+  color: #00ff88; font-family: monospace; font-size: 11px;
+  opacity: 0; transition: opacity 0.3s;
+}
+#zoom-panel {
+  position: fixed; right: 14px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: rgba(0,0,0,0.75); border: 1px solid rgba(0,255,136,0.2);
+  border-radius: 10px; padding: 10px 8px;
+  font-family: monospace; color: #00ff88;
+}
+#zoom-panel button {
+  width: 36px; height: 36px; border-radius: 6px;
+  background: #1a1a2e; border: 1px solid rgba(0,255,136,0.3);
+  color: #00ff88; font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+#zoom-panel button:hover { background: #252540; }
+#zoom-panel button:active { background: #303060; }
+#zoom-label { font-size: 10px; color: #666; }
+#zoom-val { font-size: 12px; }
+#zoom-step-row {
+  display: flex; align-items: center; gap: 4px; font-size: 11px;
+}
+#zoom-step-row input {
+  width: 38px; background: #1a1a2e; border: 1px solid rgba(0,255,136,0.2);
+  color: #fff; font-family: monospace; font-size: 11px;
+  text-align: center; border-radius: 4px; padding: 2px 4px;
+}
+#zoom-step-row input:focus { outline: none; border-color: #00ff88; }
+</style>
+</head>
+<body>
+<div id="hud">
+  pos:    [<span id="px">0</span>, <span id="py">0</span>, <span id="pz">0</span>]<br>
+  target: [<span id="tx">0</span>, <span id="ty">0</span>, <span id="tz">0</span>]
+</div>
+<button id="copy" onclick="copyKeyframe()">Copy keyframe</button>
+<div id="copied">Copied!</div>
+
+<div id="zoom-panel">
+  <div id="zoom-label">ZOOM</div>
+  <button onclick="zoom(-1)">+</button>
+  <div id="zoom-val">100%</div>
+  <button onclick="zoom(1)">−</button>
+  <div id="zoom-step-row">
+    step <input id="zoom-step" type="number" value="5" min="1" max="50">%
+  </div>
+</div>
+
+<div id="info">drag to orbit · scroll to zoom · right-drag to pan</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a12);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(130, 85, 130);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(-29, 0, 18);
+controls.update();
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+dir.position.set(5, 8, 5);
+scene.add(dir);
+const dir2 = new THREE.DirectionalLight(0x8844ff, 0.4);
+dir2.position.set(-5, 2, -5);
+scene.add(dir2);
+
+// Load GLB
+const loader = new THREE.GLTFLoader();
+loader.load('./wrath_of_the_dragon.glb', gltf => {
+  scene.add(gltf.scene);
+});
+
+// HUD elements
+const px = document.getElementById('px'), py = document.getElementById('py'), pz = document.getElementById('pz');
+const tx = document.getElementById('tx'), ty = document.getElementById('ty'), tz = document.getElementById('tz');
+
+function fmt(v) { return v.toFixed(1); }
+
+// Zoom by moving camera along its direction toward/away from target
+const baseDistance = camera.position.distanceTo(controls.target);
+let currentPct = 100;
+
+function zoom(dir) {
+  const step = parseFloat(document.getElementById('zoom-step').value) || 5;
+  currentPct = Math.max(0.1, Math.min(2000, currentPct + dir * step));
+
+  const direction = new THREE.Vector3()
+    .subVectors(camera.position, controls.target)
+    .normalize();
+  const newDist = baseDistance * (currentPct / 100);
+  camera.position.copy(
+    controls.target.clone().addScaledVector(direction, newDist)
+  );
+  controls.update();
+  document.getElementById('zoom-val').textContent = (currentPct < 10 ? currentPct.toFixed(1) : Math.round(currentPct)) + '%';
+}
+
+// Keep % display in sync when user scrolls normally
+function syncZoomPct() {
+  const d = camera.position.distanceTo(controls.target);
+  currentPct = Math.round((d / baseDistance) * 100);
+  document.getElementById('zoom-val').textContent = (currentPct < 10 ? currentPct.toFixed(1) : Math.round(currentPct)) + '%';
+}
+controls.addEventListener('change', syncZoomPct);
+
+function copyKeyframe() {
+  const p = camera.position, t = controls.target;
+  const text = `{ pos: [${fmt(p.x)}, ${fmt(p.y)}, ${fmt(p.z)}], target: [${fmt(t.x)}, ${fmt(t.y)}, ${fmt(t.z)}] }`;
+  navigator.clipboard.writeText(text);
+  const el = document.getElementById('copied');
+  el.style.opacity = 1;
+  setTimeout(() => el.style.opacity = 0, 1500);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  const p = camera.position, t = controls.target;
+  px.textContent = fmt(p.x); py.textContent = fmt(p.y); pz.textContent = fmt(p.z);
+  tx.textContent = fmt(t.x); ty.textContent = fmt(t.y); tz.textContent = fmt(t.z);
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
