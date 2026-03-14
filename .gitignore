@@ -39,4 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# worktrees
+.worktrees/
 .agent/credentials.json
+credentials.json
