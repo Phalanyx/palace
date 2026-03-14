@@ -14,6 +14,7 @@ model Palace {
   title        String
   prompt       String        @db.Text
   status       String        @default("processing") // processing | ready | error
+  coverImageUrl String?      @map("cover_image_url")
   createdAt    DateTime      @default(now()) @map("created_at")
   documents    Document[]
   rooms        Room[]

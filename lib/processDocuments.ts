@@ -3,6 +3,7 @@ import { prisma } from "./prisma"
 import { uploadToMoorcheh, createNamespace } from "./moorcheh"
 import { createClient } from '@supabase/supabase-js'
 import { generateAllMeshes } from "./meshGenerator"
+import sharp from 'sharp'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -52,6 +53,59 @@ const palaceSchema = {
   }
 }
 
+async function generateAndSaveCoverImage(
+  palaceId: string,
+  title: string,
+  prompt: string,
+) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabase = createClient(supabaseUrl, supabaseKey)
+
+  const imagePrompt =
+    `A stunning low-poly 3D landscape scene representing "${title}": ${prompt}. ` +
+    `Geometric faceted polygons, vivid complementary colors, dramatic rim lighting, ` +
+    `isometric fantasy atmosphere. Ultra-clean minimalist composition, no text, no labels.`
+
+  const result = await ai.models.generateImages({
+    model: 'imagen-4.0-generate-001',
+    prompt: imagePrompt,
+    config: { numberOfImages: 1, aspectRatio: '16:9' },
+  })
+
+  const imageBytes = result.generatedImages?.[0]?.image?.imageBytes
+  if (!imageBytes) throw new Error('No image bytes returned')
+
+  const rawBuffer = Buffer.from(imageBytes as string, 'base64')
+  console.log(`Cover image raw size: ${(rawBuffer.length / 1024 / 1024).toFixed(1)}MB`)
+
+  // Compress to JPEG (max 1280px wide, 80% quality) to keep under storage limits
+  const buffer = await sharp(rawBuffer)
+    .resize({ width: 1280, withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer()
+  console.log(`Cover image compressed size: ${(buffer.length / 1024).toFixed(0)}KB`)
+
+  const storagePath = `covers/${palaceId}.jpg`
+
+  const { error } = await supabase.storage
+    .from('palace-models')
+    .upload(storagePath, buffer, { contentType: 'image/jpeg', upsert: true })
+
+  if (error) throw error
+
+  const { data: urlData } = supabase.storage
+    .from('palace-models')
+    .getPublicUrl(storagePath)
+
+  await prisma.palace.update({
+    where: { id: palaceId },
+    data: { coverImageUrl: urlData.publicUrl },
+  })
+
+  console.log(`Cover image saved for palace ${palaceId}`)
+}
+
 export async function processDocuments(palaceId: string) {
   try {
     const palace = await prisma.palace.findUnique({
@@ -65,6 +119,11 @@ export async function processDocuments(palaceId: string) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // 1a. Generate cover image in the background — save to palace as soon as ready
+    generateAndSaveCoverImage(palace.id, palace.title, palace.prompt).catch(err =>
+      console.error('Non-fatal: cover image generation failed:', err)
+    )
 
     const combinedTextArray: string[] = []
     const documentChunks: { id: string; text: string; metadata?: any }[] = []

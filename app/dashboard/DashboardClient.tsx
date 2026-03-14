@@ -24,8 +24,9 @@ interface Palace {
   title: string
   prompt: string
   status: string
+  coverImageUrl?: string | null
   _count?: { rooms: number }
-  testSessions?: { scorePct: number }[]
+  testSessions?: { scorePct: number | null }[]
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -82,7 +83,7 @@ function RoomBlocks({ count }: { count: number }) {
 }
 
 function PalaceCard({ palace }: { palace: Palace }) {
-  const score = palace.testSessions?.[0]?.scorePct
+  const score = palace.testSessions?.[0]?.scorePct ?? undefined
   const rooms = palace._count?.rooms ?? 0
   const isError = palace.status === 'error'
   const isProcessing = palace.status === 'processing'
@@ -93,8 +94,23 @@ function PalaceCard({ palace }: { palace: Palace }) {
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col hover:border-white/20 hover:bg-white/8 transition-all">
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <StatusBadge status={palace.status} />
+      {/* Cover image */}
+      <div className="relative h-36 w-full overflow-hidden bg-white/5">
+        {palace.coverImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={palace.coverImageUrl} alt={palace.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <RotateCw className="w-5 h-5 text-white/20 animate-spin" />
+          </div>
+        )}
+        {/* Status badge overlaid on image */}
+        <div className="absolute top-3 left-3">
+          <StatusBadge status={palace.status} />
+        </div>
+      </div>
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <div />
         <RoomBlocks count={rooms} />
       </div>
       <div className="px-4 pb-4 flex-1 flex flex-col">
@@ -248,6 +264,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
         title: data.title,
         prompt: data.prompt,
         status: 'processing',
+        coverImageUrl: null,
         _count: { rooms: 0 },
         testSessions: [],
       }, ...prev])
