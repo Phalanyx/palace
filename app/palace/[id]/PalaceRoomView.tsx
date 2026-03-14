@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -59,10 +59,23 @@ const ROOM_COMPONENTS: Record<string, RoomFC> = {
 };
 
 const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: [number, number, number] }> = {
-  bedroom: { position: [12, 10, 14], target: [0, 3, 0] },
+  bedroom: { position: [8, 6, 10], target: [0, 3, 0] },
   great_hall: { position: [0, 12, 26], target: [0, 4, -1] },
-  kitchen: { position: [0, 10, 18], target: [0, 3.5, 0] },
-  library: { position: [0, 10, 20], target: [0, 4, 1] },
+  kitchen: { position: [0, 7, 12], target: [0, 3.5, 0] },
+  library: { position: [0, 8, 14], target: [0, 4, 1] },
+};
+
+// Per-room orbit constraints — tuned to each room's size so the camera
+// never zooms out far enough to see roofs/outside walls.
+const ROOM_ORBIT: Record<string, {
+  minDistance: number; maxDistance: number;
+  minPolar: number; maxPolar: number;
+  minAzimuth: number; maxAzimuth: number;
+}> = {
+  bedroom:    { minDistance: 6,  maxDistance: 16, minPolar: 0.6, maxPolar: Math.PI / 2.4, minAzimuth: -Math.PI / 4, maxAzimuth: Math.PI / 4 },
+  great_hall: { minDistance: 8,  maxDistance: 30, minPolar: 0.4, maxPolar: Math.PI / 2.2, minAzimuth: -Math.PI / 3, maxAzimuth: Math.PI / 3 },
+  kitchen:    { minDistance: 6,  maxDistance: 20, minPolar: 0.5, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 4, maxAzimuth: Math.PI / 4 },
+  library:    { minDistance: 7,  maxDistance: 24, minPolar: 0.45, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 3.5, maxAzimuth: Math.PI / 3.5 },
 };
 
 const ROOM_SLOTS: Record<string, [number, number, number][]> = {
@@ -134,12 +147,14 @@ export default function PalaceRoomView({
   const [openObjectIds, setOpenObjectIds] = useState<Set<string>>(new Set());
   const controlsRef = useRef<any>(null);
   const cameraTargetRef = useRef(new THREE.Vector3(0, 3, 0));
+  const pendingObjectIdxRef = useRef<number | null>(null);
 
   const activeRoom = rooms[activeRoomIdx];
   const objects = activeRoom?.objects ?? [];
   const currentObj = objects[activeObjectIdx];
   const RoomComponent = activeRoom ? ROOM_COMPONENTS[activeRoom.roomKey] : null;
   const cameraConfig = activeRoom ? ROOM_CAMERA[activeRoom.roomKey] : null;
+  const orbitConfig = activeRoom ? (ROOM_ORBIT[activeRoom.roomKey] ?? ROOM_ORBIT.great_hall) : ROOM_ORBIT.great_hall;
   const slots = activeRoom ? (ROOM_SLOTS[activeRoom.roomKey] || []) : [];
   const isTestMode = appPhase === 'test';
   const currentQuestion = isTestMode ? testQuestions.find(q => q.objectId === currentObj?.id) : null;
@@ -165,7 +180,12 @@ export default function PalaceRoomView({
   const isAtEnd = activeRoomIdx === rooms.length - 1 && activeObjectIdx === objects.length - 1;
 
   useEffect(() => {
-    setActiveObjectIdx(0);
+    if (pendingObjectIdxRef.current != null) {
+      setActiveObjectIdx(pendingObjectIdxRef.current);
+      pendingObjectIdxRef.current = null;
+    } else {
+      setActiveObjectIdx(0);
+    }
     if (cameraConfig) cameraTargetRef.current.set(...cameraConfig.target);
   }, [activeRoomIdx]);
 
@@ -275,9 +295,13 @@ export default function PalaceRoomView({
           target={cameraConfig?.target || [0, 3, 0]}
           enableDamping
           dampingFactor={0.08}
-          minDistance={5}
-          maxDistance={40}
-          maxPolarAngle={Math.PI / 2}
+          enablePan={false}
+          minDistance={orbitConfig.minDistance}
+          maxDistance={orbitConfig.maxDistance}
+          minPolarAngle={orbitConfig.minPolar}
+          maxPolarAngle={orbitConfig.maxPolar}
+          minAzimuthAngle={orbitConfig.minAzimuth}
+          maxAzimuthAngle={orbitConfig.maxAzimuth}
         />
         <CameraTargetAnimator target={cameraTargetRef.current} controlsRef={controlsRef} />
       </Canvas>
@@ -536,15 +560,31 @@ export default function PalaceRoomView({
         </>
       )}
 
-      {/* BuddyAgent — always mounted to keep WS connection alive across phases */}
-      <BuddyAgent
-        palace={{ id: palaceId, title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
-        currentRoom={activeRoom ?? null}
-        selectedObject={currentObj ?? null}
-        openObjects={openObjects}
-        isTestMode={appPhase === 'test'}
-        currentTestQuestion={currentQuestion?.questionText}
-      />
+      {/* BuddyAgent — hidden during test mode */}
+      {appPhase !== 'test' && (
+        <BuddyAgent
+          palace={{ id: palaceId, title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
+          currentRoom={activeRoom ?? null}
+          selectedObject={currentObj ?? null}
+          openObjects={openObjects}
+          isTestMode={false}
+          currentTestQuestion={undefined}
+          rooms={rooms}
+          onNavigate={useCallback((roomIndex: number, objectIndex: number) => {
+            console.log('[NAV] onNavigate called:', { roomIndex, objectIndex });
+            setActiveRoomIdx(prev => {
+              if (prev === roomIndex) {
+                // Same room — set object directly
+                setActiveObjectIdx(objectIndex);
+                return prev;
+              }
+              // Different room — stash object for the effect
+              pendingObjectIdxRef.current = objectIndex;
+              return roomIndex;
+            });
+          }, [])}
+        />
+      )}
     </div>
   );
 }
