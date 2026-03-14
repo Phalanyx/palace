@@ -1,344 +1,237 @@
 "use client"
 
-import Link from "next/link"
 import { useState } from "react"
-import {
-  CheckCircle2Icon,
-  LoaderCircleIcon,
-  PlusIcon,
-  SparklesIcon,
-  UploadCloudIcon,
-  XCircleIcon,
-} from "lucide-react"
+import { UploadCloud, CheckCircle2, RotateCw, XCircle } from "lucide-react"
+import Link from 'next/link'
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import { Textarea } from "@/components/ui/textarea"
-
-interface PalaceCardData {
-  id: string
-  title: string
-  prompt: string
-  status: string
-  _count?: {
-    rooms: number
-  }
-  testSessions?: Array<{
-    scorePct?: number | null
-  }>
+interface DashboardProps {
+  palaces: any[]
 }
 
-export default function DashboardClient({
-  initialPalaces,
-  userEmail,
-}: {
-  initialPalaces: PalaceCardData[]
-  userEmail: string
-}) {
+export default function DashboardClient({ initialPalaces }: { initialPalaces: any[] }) {
   const [palaces, setPalaces] = useState(initialPalaces)
-  const [isNewSheetOpen, setIsNewSheetOpen] = useState(false)
+  const [isNewDrawerOpen, setIsNewDrawerOpen] = useState(false)
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    switch (status) {
+      case 'processing':
+        return (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-200">
+            <RotateCw className="w-3.5 h-3.5 animate-spin" />
+            <span className="capitalize">{status}</span>
+          </div>
+        )
+      case 'ready':
+        return (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-medium border border-green-200">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="capitalize">{status}</span>
+          </div>
+        )
+      case 'error':
+        return (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+            <XCircle className="w-3.5 h-3.5" />
+            <span className="capitalize">{status}</span>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4 rounded-[2rem] border border-border/60 bg-background/80 p-5 shadow-xl backdrop-blur md:flex-row md:items-end md:justify-between">
-        <div className="flex max-w-2xl flex-col gap-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/70">
-            Study studio
-          </p>
-          <p className="text-lg text-muted-foreground">
-            Upload material, generate rooms, and return for active recall whenever you want another pass through the palace.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 self-start md:self-auto">
-          <Button onClick={() => setIsNewSheetOpen(true)}>
-            <PlusIcon data-icon="inline-start" />
-            New palace
-          </Button>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border/60 bg-card/85 shadow-lg">
-          <CardHeader>
-            <CardDescription>Total palaces</CardDescription>
-            <CardTitle className="font-[family-name:var(--font-baloo)] text-4xl">
-              {palaces.length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-border/60 bg-card/85 shadow-lg">
-          <CardHeader>
-            <CardDescription>Ready to explore</CardDescription>
-            <CardTitle className="font-[family-name:var(--font-baloo)] text-4xl">
-              {palaces.filter((palace) => palace.status === "ready").length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="border-border/60 bg-card/85 shadow-lg">
-          <CardHeader>
-            <CardDescription>Latest learner</CardDescription>
-            <CardTitle className="truncate text-lg">{userEmail}</CardTitle>
-          </CardHeader>
-        </Card>
-      </section>
-
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {palaces.map((palace) => (
-          <Card
-            key={palace.id}
-            className="border-border/60 bg-card/90 shadow-lg transition-transform hover:-translate-y-1"
+    <div className="min-h-screen bg-[#EEF2FF] font-sans selection:bg-indigo-200">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h1 className="text-3xl font-bold text-indigo-950 font-['Baloo_2']">My Memory Palaces</h1>
+            <p className="text-indigo-700/80 mt-1">Review your generated learning environments</p>
+          </div>
+          <button 
+            onClick={() => setIsNewDrawerOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-2xl font-medium shadow-[0_4px_0_0_rgba(67,56,202,1)] hover:translate-y-[2px] hover:shadow-[0_2px_0_0_rgba(67,56,202,1)] active:translate-y-[4px] active:shadow-none transition-all duration-150 cursor-pointer"
           >
-            <CardHeader className="gap-3">
-              <div className="flex items-start justify-between gap-3">
+            <UploadCloud className="w-5 h-5" />
+            New Palace
+          </button>
+        </div>
+
+        {/* List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {palaces.map((palace) => (
+            <Link 
+              href={`/palace/${palace.id}`}
+              key={palace.id} 
+              className="group bg-white rounded-3xl p-6 border-4 border-indigo-100/50 shadow-sm hover:border-indigo-200 transition-colors duration-200 cursor-pointer relative overflow-hidden block"
+            >
+              <div className="flex justify-between items-start mb-4">
                 <StatusBadge status={palace.status} />
-                <Badge variant="outline" className="rounded-full">
+                <span className="text-sm font-medium text-slate-400 bg-slate-50 px-2.5 py-1 rounded-xl">
                   {palace._count?.rooms || 0} rooms
-                </Badge>
+                </span>
               </div>
-              <CardTitle className="font-[family-name:var(--font-baloo)] text-3xl">
-                {palace.title}
-              </CardTitle>
-              <CardDescription className="line-clamp-3 text-base leading-7">
-                {palace.prompt}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {palace.testSessions?.[0]?.scorePct !== undefined &&
-              palace.testSessions?.[0]?.scorePct !== null ? (
-                <div className="flex items-center justify-between rounded-2xl bg-muted px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Latest score
-                  </span>
-                  <Badge className="rounded-full">
+              <h3 className="text-xl font-bold text-indigo-950 font-['Baloo_2'] mb-2">{palace.title}</h3>
+              <p className="text-slate-500 text-sm line-clamp-2">{palace.prompt}</p>
+              
+              {palace.testSessions?.[0]?.scorePct !== undefined && (
+                <div className="mt-4 pt-4 border-t border-indigo-50 flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Latest Score</span>
+                  <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">
                     {Math.round(palace.testSessions[0].scorePct)}%
-                  </Badge>
-                </div>
-              ) : (
-                <div className="rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">
-                  No quiz results yet. Enter the palace to start testing recall.
+                  </span>
                 </div>
               )}
-            </CardContent>
-            <CardFooter className="justify-between gap-3">
-              <Button
-                variant="outline"
-                render={<Link href={`/palace/${palace.id}`} />}
-                nativeButton={false}
-              >
-                Open palace
-              </Button>
-              <Button
-                variant="ghost"
-                render={<Link href={`/palace/${palace.id}/history`} />}
-                nativeButton={false}
-              >
-                History
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+            </Link>
+          ))}
+          
+          {palaces.length === 0 && (
+            <div className="col-span-full py-16 text-center border-4 border-dashed border-indigo-200 rounded-3xl bg-indigo-50/50">
+              <UploadCloud className="w-12 h-12 text-indigo-300 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-indigo-900 font-['Baloo_2'] mb-2">No Palaces Yet</h3>
+              <p className="text-indigo-600/70 max-w-md mx-auto">Upload a document and tell us what you want to learn to generate your first magical memory palace.</p>
+            </div>
+          )}
+        </div>
 
-        {palaces.length === 0 ? (
-          <Card className="border-border/60 bg-card/90 shadow-lg md:col-span-2 xl:col-span-3">
-            <CardHeader className="items-center text-center">
-              <div className="flex size-14 items-center justify-center rounded-[1.5rem] bg-primary/10 text-primary">
-                <SparklesIcon />
-              </div>
-              <CardTitle className="font-[family-name:var(--font-baloo)] text-4xl">
-                No palaces yet
-              </CardTitle>
-              <CardDescription className="max-w-xl text-base leading-7">
-                Upload source material and describe what you want to memorize. The generator will build your first palace from there.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter className="justify-center">
-              <Button onClick={() => setIsNewSheetOpen(true)}>
-                <UploadCloudIcon data-icon="inline-start" />
-                Create your first palace
-              </Button>
-            </CardFooter>
-          </Card>
-        ) : null}
-      </section>
+      </div>
 
-      <NewPalaceSheet
-        isOpen={isNewSheetOpen}
-        onOpenChange={setIsNewSheetOpen}
-        onSuccess={(newPalace) => {
-          setPalaces((current) => [newPalace, ...current])
-        }}
-      />
+      {isNewDrawerOpen && (
+        <NewPalaceDrawer 
+          onClose={() => setIsNewDrawerOpen(false)} 
+          onSuccess={(newPalace) => {
+            setPalaces([newPalace, ...palaces])
+            setIsNewDrawerOpen(false)
+          }} 
+        />
+      )}
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === "ready") {
-    return (
-      <Badge className="rounded-full">
-        <CheckCircle2Icon data-icon="inline-start" />
-        Ready
-      </Badge>
-    )
-  }
-
-  if (status === "error") {
-    return (
-      <Badge variant="destructive" className="rounded-full">
-        <XCircleIcon data-icon="inline-start" />
-        Error
-      </Badge>
-    )
-  }
-
-  return (
-    <Badge variant="secondary" className="rounded-full">
-      <LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
-      Processing
-    </Badge>
-  )
-}
-
-function NewPalaceSheet({
-  isOpen,
-  onOpenChange,
-  onSuccess,
-}: {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  onSuccess: (palace: PalaceCardData) => void
-}) {
+function NewPalaceDrawer({ onClose, onSuccess }: { onClose: () => void, onSuccess: (p: any) => void }) {
   const [title, setTitle] = useState("")
   const [prompt, setPrompt] = useState("")
   const [files, setFiles] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  async function handleSubmit() {
-    if (!title || !prompt || files.length === 0) {
-      return
-    }
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!title || !prompt || files.length === 0) return
+    
     setIsSubmitting(true)
     const formData = new FormData()
     formData.append("title", title)
     formData.append("prompt", prompt)
-    files.forEach((file) => formData.append("files", file))
+    files.forEach(f => formData.append("files", f))
 
     try {
-      const response = await fetch("/api/palaces", {
+      const res = await fetch("/api/palaces", {
         method: "POST",
         body: formData,
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to create palace.")
+      if (res.ok) {
+        const data = await res.json()
+        // Optimistic UI update
+        onSuccess({
+          id: data.palaceId,
+          title,
+          prompt,
+          status: 'processing',
+          _count: { rooms: 0 },
+          createdAt: new Date().toISOString()
+        })
       }
-
-      const data = await response.json()
-
-      onSuccess({
-        id: data.palaceId,
-        title,
-        prompt,
-        status: "processing",
-        _count: { rooms: 0 },
-        testSessions: [],
-      })
-
-      setTitle("")
-      setPrompt("")
-      setFiles([])
-      onOpenChange(false)
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
+      console.error(err)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 border-l border-border sm:max-w-xl">
-        <SheetHeader className="border-b border-border px-6 py-5">
-          <SheetTitle className="font-[family-name:var(--font-baloo)] text-3xl">
-            Create a new palace
-          </SheetTitle>
-          <SheetDescription className="text-base leading-7">
-            Upload documents, describe the learning goal, and let the generator assemble the rooms.
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="palace-title">Palace title</Label>
-            <Input
-              id="palace-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="e.g. The French Revolution"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="palace-prompt">Learning goal</Label>
-            <Textarea
-              id="palace-prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="What should the palace help you understand and remember?"
-              className="min-h-36"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="palace-files">Source documents</Label>
-            <Input
-              id="palace-files"
-              type="file"
-              multiple
-              accept=".txt,.pdf,.pptx"
-              onChange={(event) =>
-                setFiles(event.target.files ? Array.from(event.target.files) : [])
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Accepted formats: `.txt`, `.pdf`, `.pptx`
-            </p>
-            {files.length > 0 ? (
-              <div className="flex flex-col gap-2 rounded-2xl bg-muted p-4">
-                {files.map((file) => (
-                  <div key={file.name} className="flex items-center gap-2 text-sm">
-                    <UploadCloudIcon />
-                    <span className="truncate">{file.name}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-indigo-950/20 backdrop-blur-sm cursor-pointer" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right-full duration-300">
+        <div className="p-6 border-b border-indigo-50 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-indigo-950 font-['Baloo_2']">Create Memory Palace</h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors">
+            <XCircle className="w-6 h-6" />
+          </button>
         </div>
+        
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Palace Title</label>
+            <input 
+              required
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. History of Rome"
+              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all outline-none"
+            />
+          </div>
 
-        <SheetFooter className="border-t border-border px-6 py-5">
-          <Button
-            className="h-11"
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Learning Goal</label>
+            <textarea 
+              required
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder="What specific concepts do you want to extract and memorize?"
+              className="w-full h-32 px-4 py-3 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all outline-none resize-none"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">Source Documents</label>
+            <div className="relative border-3 border-dashed border-indigo-200 rounded-3xl bg-indigo-50/50 hover:bg-indigo-50 transition-colors p-8 text-center cursor-pointer">
+              <input 
+                required
+                type="file" 
+                multiple
+                accept=".txt,.pdf,.pptx"
+                onChange={e => e.target.files && setFiles(Array.from(e.target.files))}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <UploadCloud className="w-10 h-10 text-indigo-400 mx-auto mb-3" />
+              <p className="font-medium text-indigo-900">Drop files or click to browse</p>
+              <p className="text-xs text-indigo-600/70 mt-1">.txt, .pdf, .pptx supported</p>
+              
+              {files.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-indigo-100 text-left">
+                  <p className="text-xs font-bold text-indigo-800 mb-2">Selected files:</p>
+                  <ul className="space-y-1">
+                    {files.map(f => (
+                      <li key={f.name} className="text-sm text-indigo-600 flex items-center gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {f.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </form>
+
+        <div className="p-6 border-t border-indigo-50 bg-white">
+          <button 
             onClick={handleSubmit}
             disabled={isSubmitting || !title || !prompt || files.length === 0}
+            className="w-full flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:pointer-events-none text-white px-5 py-3.5 rounded-2xl font-bold shadow-[0_4px_0_0_rgba(67,56,202,1)] hover:translate-y-[2px] hover:shadow-[0_2px_0_0_rgba(67,56,202,1)] active:translate-y-[4px] active:shadow-none transition-all duration-150 cursor-pointer"
           >
-            {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <SparklesIcon />}
-            {isSubmitting ? "Generating palace..." : "Generate palace"}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+            {isSubmitting ? (
+              <><RotateCw className="w-5 h-5 animate-spin" /> Generating Palace...</>
+            ) : (
+              'Create Storage & Process'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -1,36 +1,13 @@
 import { NextResponse } from 'next/server'
-import { requireApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { askMoorcheh } from '@/lib/moorcheh'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
-type SessionQuestion = {
-  objectId: string
-  questionText: string
-  correctAnswer: string
-  userAnswer: string | null
-  isCorrect?: boolean
-  aiFeedback?: string | null
-}
-
-type SessionEvaluation = {
-  isCorrect: boolean
-  feedback: string
-}
-
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request, context: any) {
   try {
-    const auth = await requireApiUser()
-    if (!auth.user) {
-      return auth.response
-    }
-
-    const params = await context.params
+    const { params } = context
     const sessionId = params.id
     const { objectId, userAnswer } = await request.json()
 
@@ -43,15 +20,15 @@ export async function POST(
       include: { palace: true }
     })
 
-    if (!session || session.palace.userId !== auth.user.id) {
+    if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    const parsedQuestions: SessionQuestion[] = Array.isArray(session.questions) 
+    let parsedQuestions = Array.isArray(session.questions) 
       ? session.questions 
-      : JSON.parse(session.questions as string)
+      : JSON.parse(session.questions as string);
       
-    const currentQIndex = parsedQuestions.findIndex((question) => question.objectId === objectId)
+    const currentQIndex = parsedQuestions.findIndex((q: any) => q.objectId === objectId)
     
     if (currentQIndex === -1) {
       return NextResponse.json({ error: 'Question not found in session' }, { status: 404 })
@@ -94,14 +71,14 @@ export async function POST(
     `
 
     const response = await model.generateContent(prompt)
-    let evaluation: SessionEvaluation
+    let evaluation
     try {
       let cleanResponse = response.response.text()
       if (cleanResponse.startsWith('```json')) {
           cleanResponse = cleanResponse.split('```json')[1].split('```')[0].trim()
       }
       evaluation = JSON.parse(cleanResponse)
-    } catch {
+    } catch (e) {
       evaluation = {
         isCorrect: true, // Optimistic fallback
         feedback: "Good attempt! Make sure to review the core concepts."
@@ -117,7 +94,7 @@ export async function POST(
     }
     
     // Check if session is completed
-    const allAnswered = parsedQuestions.every((question) => question.userAnswer !== null)
+    const allAnswered = parsedQuestions.every((q: any) => q.userAnswer !== null)
     let scorePct = session.scorePct
     let status = session.status
     let completedAt = session.completedAt
@@ -150,9 +127,8 @@ export async function POST(
       sessionComplete: allAnswered
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error grading answer:', error)
-    const message = error instanceof Error ? error.message : 'Failed to grade answer'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Failed to grade answer' }, { status: 500 })
   }
 }
