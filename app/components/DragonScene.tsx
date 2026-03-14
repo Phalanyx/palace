@@ -109,14 +109,40 @@ function Dragon() {
     scene.traverse((obj: THREE.Object3D) => {
       const mesh = obj as THREE.Mesh
       if (!mesh.isMesh) return
-      if (!obj.name.toLowerCase().includes('magicspell')) return
+      const isBreath  = obj.name.toLowerCase().includes('magicspell')
+      const isWizard  = obj.name === 'Wizard_0' || obj.name === 'LeaderWarrior_0'
+      if (!isBreath && !isWizard) return
       if (obj.children.some(c => c.name === '__breath_glow__')) return
 
       const mat = mesh.material as THREE.MeshStandardMaterial
       if (mat && 'emissive' in mat) {
-        mat.emissive = new THREE.Color(0.1, 0.8, 1.0)
-        mat.emissiveIntensity = 3.5
-        mat.toneMapped = false
+        if (isWizard) {
+          const wizMat = mat.clone()
+          wizMat.emissiveIntensity = 10.0
+          wizMat.toneMapped = false
+          mesh.material = wizMat
+        } else {
+          mat.emissive = new THREE.Color(0.1, 0.8, 1.0)
+          mat.emissiveIntensity = 3.5
+          mat.toneMapped = false
+        }
+      }
+
+      if (isWizard) {
+        // Additive layers — the emissive texture drives the color, these amplify it
+        for (const [color, opacity] of [
+          [new THREE.Color(0.2, 1.0, 0.4), 0.35],
+          [new THREE.Color(0.1, 0.6, 0.3), 0.20],
+        ] as [THREE.Color, number][]) {
+          const layer = new THREE.Mesh(
+            mesh.geometry,
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }),
+          )
+          layer.name = '__breath_glow__'
+          mesh.add(layer)
+          added.push(layer)
+        }
+        return
       }
 
       // Flat emissive overlay (same geometry, child of mesh = auto-aligned)
@@ -159,19 +185,36 @@ const BREATH_POS: [number, number, number] = [3.3, 20.4, -2.3]
 const SUN_POS: [number, number, number] = [68.7, 181.0, -330.2]
 
 function SunGlow() {
+  const lightRef  = useRef<THREE.PointLight>(null)
+  const matsRef   = useRef<THREE.MeshBasicMaterial[]>([])
+
+  const layers: [number, number, number][] = [
+    [30,  0xfff8e0, 0.85],
+    [55,  0xffcc44, 0.55],
+    [90,  0xff9900, 0.30],
+  ]
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
+    const pulse = Math.sin(t * 0.9) * 0.18 + Math.sin(t * 2.1) * 0.08
+    if (lightRef.current) lightRef.current.intensity = 80 + pulse * 80
+    matsRef.current.forEach((mat, i) => {
+      const base = layers[i][2]
+      mat.opacity = Math.max(0, base + pulse)
+    })
+  })
+
   return (
     <group position={SUN_POS}>
-      <pointLight color="#ffaa33" intensity={30} distance={300} decay={2} />
-      {/* Stacked additive spheres — fakes bloom around the sun disc */}
-      {([
-        [30,  0xfff8e0, 0.60],
-        [55,  0xffcc44, 0.32],
-        [90,  0xff9900, 0.16],
-        [140, 0xff6600, 0.07],
-      ] as [number, number, number][]).map(([r, color, opacity], i) => (
+      <pointLight ref={lightRef} color="#ffaa33" intensity={80} distance={500} decay={1.5} />
+      {layers.map(([r, color, opacity], i) => (
         <mesh key={i}>
           <sphereGeometry args={[r, 16, 16]} />
-          <meshBasicMaterial color={color} transparent opacity={opacity} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <meshBasicMaterial
+            ref={m => { if (m) matsRef.current[i] = m }}
+            color={color} transparent opacity={opacity}
+            blending={THREE.AdditiveBlending} depthWrite={false}
+          />
         </mesh>
       ))}
     </group>
