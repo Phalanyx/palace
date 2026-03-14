@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a12; overflow: hidden; font-family: monospace; color: #00ff88; }
+canvas { display: block; }
+
+#panel {
+  position: fixed; left: 14px; top: 14px; bottom: 14px; width: 230px;
+  background: rgba(0,0,0,0.85); border: 1px solid rgba(0,255,136,0.25);
+  border-radius: 10px; padding: 12px; overflow-y: auto; z-index: 10;
+}
+#panel h2 { font-size: 12px; color: #00ff88; margin-bottom: 10px; letter-spacing: 1px; }
+.sec { margin-bottom: 10px; border-top: 1px solid rgba(0,255,136,0.1); padding-top: 8px; }
+.sec-title { font-size: 10px; color: #00ff88; opacity: 0.6; margin-bottom: 6px; text-transform: uppercase; }
+.row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+.row label { width: 28px; font-size: 10px; color: #888; flex-shrink: 0; }
+.row input[type=range] { flex: 1; height: 3px; accent-color: #00ff88; cursor: pointer; }
+.row .num {
+  width: 52px; background: #111; border: 1px solid rgba(0,255,136,0.2);
+  color: #fff; font-size: 10px; font-family: monospace;
+  text-align: center; border-radius: 4px; padding: 2px 3px;
+}
+.row .num:focus { outline: none; border-color: #00ff88; }
+
+button {
+  width: 100%; padding: 7px; margin-top: 4px;
+  background: #1a1a2e; border: 1px solid rgba(0,255,136,0.35);
+  color: #00ff88; font-family: monospace; font-size: 11px;
+  cursor: pointer; border-radius: 6px;
+}
+button:hover { background: #252540; }
+#copied { font-size: 10px; text-align: center; opacity: 0; transition: opacity 0.3s; margin-top: 4px; }
+
+#hud {
+  position: fixed; right: 14px; top: 14px;
+  background: rgba(0,0,0,0.75); color: #00ff88;
+  font-size: 12px; padding: 10px 14px; border-radius: 8px;
+  line-height: 1.9; border: 1px solid rgba(0,255,136,0.2); z-index: 10;
+}
+#hud span { color: #fff; }
+#info {
+  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+  color: #555; font-size: 11px; z-index: 10;
+}
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <h2>🐉 BREATH TUNER</h2>
+
+  <div class="sec">
+    <div class="sec-title">Mouth (tip of cone)</div>
+    <div class="row"><label>X</label><input type="range" id="mx" min="-60" max="60" step="0.1" value="5.8"><input class="num" id="mx_v" value="5.8"></div>
+    <div class="row"><label>Y</label><input type="range" id="my" min="-10" max="60" step="0.1" value="3.0"><input class="num" id="my_v" value="3.0"></div>
+    <div class="row"><label>Z</label><input type="range" id="mz" min="-80" max="80" step="0.1" value="-46.0"><input class="num" id="mz_v" value="-46.0"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Impact (base/wide end)</div>
+    <div class="row"><label>X</label><input type="range" id="ix" min="-60" max="60" step="0.1" value="3.0"><input class="num" id="ix_v" value="3.0"></div>
+    <div class="row"><label>Y</label><input type="range" id="iy" min="-10" max="80" step="0.1" value="40.0"><input class="num" id="iy_v" value="40.0"></div>
+    <div class="row"><label>Z</label><input type="range" id="iz" min="-80" max="80" step="0.1" value="44.0"><input class="num" id="iz_v" value="44.0"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Cone Shape</div>
+    <div class="row"><label>R1</label><input type="range" id="r1" min="1" max="60" step="0.5" value="12"><input class="num" id="r1_v" value="12"></div>
+    <div class="row"><label>R2</label><input type="range" id="r2" min="1" max="80" step="0.5" value="22"><input class="num" id="r2_v" value="22"></div>
+    <div class="row"><label>R3</label><input type="range" id="r3" min="1" max="100" step="0.5" value="34"><input class="num" id="r3_v" value="34"></div>
+    <div class="row"><label>+L</label><input type="range" id="ext" min="-30" max="50" step="0.5" value="0"><input class="num" id="ext_v" value="0"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Opacity</div>
+    <div class="row"><label>O1</label><input type="range" id="o1" min="0" max="1" step="0.01" value="0.75"><input class="num" id="o1_v" value="0.75"></div>
+    <div class="row"><label>O2</label><input type="range" id="o2" min="0" max="1" step="0.01" value="0.50"><input class="num" id="o2_v" value="0.50"></div>
+    <div class="row"><label>O3</label><input type="range" id="o3" min="0" max="1" step="0.01" value="0.25"><input class="num" id="o3_v" value="0.25"></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Glow Spheres</div>
+    <div class="row"><label>Sr1</label><input type="range" id="sr1" min="1" max="40" step="0.5" value="10"><input class="num" id="sr1_v" value="10"></div>
+    <div class="row"><label>Sr2</label><input type="range" id="sr2" min="1" max="60" step="0.5" value="18"><input class="num" id="sr2_v" value="18"></div>
+  </div>
+
+  <button onclick="copyParams()">📋 Copy params</button>
+  <div id="copied">Copied!</div>
+</div>
+
+<div id="hud">
+  cam pos: [<span id="px">0</span>, <span id="py">0</span>, <span id="pz">0</span>]<br>
+  target:  [<span id="tx">0</span>, <span id="ty">0</span>, <span id="tz">0</span>]
+</div>
+<div id="info">drag gizmo to move breath · orbit outside gizmo · scroll to zoom · Esc to reset</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+<script>
+// ─── Scene setup ────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a12);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(60, 40, 80);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(4, 20, -2);   // ≈ MagicSpell boxCenter
+controls.update();
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dir1 = new THREE.DirectionalLight(0xffffff, 1.5);
+dir1.position.set(5, 8, 5); scene.add(dir1);
+const dir2 = new THREE.DirectionalLight(0x8844ff, 0.4);
+dir2.position.set(-5, 2, -5); scene.add(dir2);
+
+// Load GLB
+const loader = new THREE.GLTFLoader();
+loader.load('./wrath_of_the_dragon.glb', gltf => { scene.add(gltf.scene); });
+
+// ─── Transform controls (drag handle) ────────────────────────────────────────
+// Invisible sphere sitting at beamMid — drag it to move the whole breath group
+const handle = new THREE.Mesh(
+  new THREE.SphereGeometry(1.5, 8, 8),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+scene.add(handle);
+
+const transformControls = new THREE.TransformControls(camera, renderer.domElement);
+transformControls.attach(handle);
+transformControls.setMode('translate');
+scene.add(transformControls);
+
+// While dragging, disable orbit so they don't fight
+transformControls.addEventListener('dragging-changed', e => {
+  controls.enabled = !e.value;
+});
+
+// Track offset between handle and mouth/impact so the whole group moves together
+let offsetMouthFromMid = new THREE.Vector3();
+let offsetImpactFromMid = new THREE.Vector3();
+
+transformControls.addEventListener('mouseDown', () => {
+  const mx = parseFloat(document.getElementById('mx').value);
+  const my = parseFloat(document.getElementById('my').value);
+  const mz = parseFloat(document.getElementById('mz').value);
+  const ix = parseFloat(document.getElementById('ix').value);
+  const iy = parseFloat(document.getElementById('iy').value);
+  const iz = parseFloat(document.getElementById('iz').value);
+  const mouth  = new THREE.Vector3(mx, my, mz);
+  const impact = new THREE.Vector3(ix, iy, iz);
+  offsetMouthFromMid  = mouth.clone().sub(handle.position);
+  offsetImpactFromMid = impact.clone().sub(handle.position);
+});
+
+transformControls.addEventListener('change', () => {
+  if (!transformControls.dragging) return;
+  const h = handle.position;
+  const newMouth  = h.clone().add(offsetMouthFromMid);
+  const newImpact = h.clone().add(offsetImpactFromMid);
+
+  // Update sliders + number boxes
+  [['mx', newMouth.x],['my', newMouth.y],['mz', newMouth.z],
+   ['ix', newImpact.x],['iy', newImpact.y],['iz', newImpact.z]
+  ].forEach(([id, val]) => {
+    document.getElementById(id).value = val;
+    document.getElementById(id + '_v').value = val.toFixed(1);
+  });
+
+  buildCones();
+});
+
+// Sync handle to beamMid whenever sliders change
+function syncHandle() {
+  const mx = parseFloat(document.getElementById('mx').value);
+  const my = parseFloat(document.getElementById('my').value);
+  const mz = parseFloat(document.getElementById('mz').value);
+  const ix = parseFloat(document.getElementById('ix').value);
+  const iy = parseFloat(document.getElementById('iy').value);
+  const iz = parseFloat(document.getElementById('iz').value);
+  handle.position.set((mx+ix)/2, (my+iy)/2, (mz+iz)/2);
+}
+syncHandle();
+
+// Press T = translate, R = rotate (rotate spins the whole cone direction not supported yet, so just translate)
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') transformControls.reset();
+});
+
+// ─── Breath cone group ───────────────────────────────────────────────────────
+const breathGroup = new THREE.Group();
+scene.add(breathGroup);
+
+// Materials
+const matCore  = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+const matMid   = new THREE.MeshBasicMaterial({ color: 0x55ffff, transparent: true, opacity: 0.50, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+const matOuter = new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.25, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+const matGlowS = new THREE.MeshBasicMaterial({ color: 0xaaffff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
+const matGlowL = new THREE.MeshBasicMaterial({ color: 0x33ddff, transparent: true, opacity: 0.30, blending: THREE.AdditiveBlending, depthWrite: false });
+const matSpark = new THREE.MeshBasicMaterial({ color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false });
+
+// Cone meshes (geometry rebuilt on param change)
+let coneMeshCore, coneMeshMid, coneMeshOuter;
+let sphereMouth, sphereTip, sphereSpark;
+
+function buildCones() {
+  breathGroup.clear();
+
+  const mx = parseFloat(document.getElementById('mx').value);
+  const my = parseFloat(document.getElementById('my').value);
+  const mz = parseFloat(document.getElementById('mz').value);
+  const ix = parseFloat(document.getElementById('ix').value);
+  const iy = parseFloat(document.getElementById('iy').value);
+  const iz = parseFloat(document.getElementById('iz').value);
+  const r1 = parseFloat(document.getElementById('r1').value);
+  const r2 = parseFloat(document.getElementById('r2').value);
+  const r3 = parseFloat(document.getElementById('r3').value);
+  const ext= parseFloat(document.getElementById('ext').value);
+  const o1 = parseFloat(document.getElementById('o1').value);
+  const o2 = parseFloat(document.getElementById('o2').value);
+  const o3 = parseFloat(document.getElementById('o3').value);
+  const sr1= parseFloat(document.getElementById('sr1').value);
+  const sr2= parseFloat(document.getElementById('sr2').value);
+
+  const mouth  = new THREE.Vector3(mx, my, mz);
+  const impact = new THREE.Vector3(ix, iy, iz);
+  const mid    = new THREE.Vector3().addVectors(mouth, impact).multiplyScalar(0.5);
+
+  const dir = new THREE.Vector3().subVectors(impact, mouth).normalize();
+  const up  = new THREE.Vector3(0, 1, 0);
+  const q   = new THREE.Quaternion().setFromUnitVectors(up, dir);
+  const h   = mouth.distanceTo(impact) + ext;
+
+  matCore.opacity  = o1;
+  matMid.opacity   = o2;
+  matOuter.opacity = o3;
+
+  // Core cone
+  const gCore = new THREE.ConeGeometry(r1, h, 20, 1, true);
+  coneMeshCore = new THREE.Mesh(gCore, matCore);
+  coneMeshCore.position.copy(mid);
+  coneMeshCore.quaternion.copy(q);
+  breathGroup.add(coneMeshCore);
+
+  // Mid cone
+  const gMid = new THREE.ConeGeometry(r2, h + 2, 20, 1, true);
+  coneMeshMid = new THREE.Mesh(gMid, matMid);
+  coneMeshMid.position.copy(mid);
+  coneMeshMid.quaternion.copy(q);
+  breathGroup.add(coneMeshMid);
+
+  // Outer cone
+  const gOuter = new THREE.ConeGeometry(r3, h + 5, 20, 1, true);
+  coneMeshOuter = new THREE.Mesh(gOuter, matOuter);
+  coneMeshOuter.position.copy(mid);
+  coneMeshOuter.quaternion.copy(q);
+  breathGroup.add(coneMeshOuter);
+
+  // Mouth sphere
+  sphereMouth = new THREE.Mesh(new THREE.SphereGeometry(sr1, 16, 16), matGlowS);
+  sphereMouth.position.copy(mouth);
+  breathGroup.add(sphereMouth);
+
+  // Tip sphere
+  sphereTip = new THREE.Mesh(new THREE.SphereGeometry(sr2, 16, 16), matGlowL);
+  sphereTip.position.copy(impact);
+  breathGroup.add(sphereTip);
+
+  // Spark
+  sphereSpark = new THREE.Mesh(new THREE.SphereGeometry(Math.max(1, sr1 * 0.35), 12, 12), matSpark);
+  sphereSpark.position.copy(mouth);
+  breathGroup.add(sphereSpark);
+}
+
+buildCones();
+
+// ─── Param sync ──────────────────────────────────────────────────────────────
+const ids = ['mx','my','mz','ix','iy','iz','r1','r2','r3','ext','o1','o2','o3','sr1','sr2'];
+ids.forEach(id => {
+  const slider = document.getElementById(id);
+  const valBox = document.getElementById(id + '_v');
+
+  slider.addEventListener('input', () => {
+    valBox.value = parseFloat(slider.value).toFixed(id.startsWith('o') ? 2 : 1);
+    buildCones(); syncHandle();
+  });
+  valBox.addEventListener('change', () => {
+    slider.value = parseFloat(valBox.value);
+    valBox.value = parseFloat(valBox.value).toFixed(id.startsWith('o') ? 2 : 1);
+    buildCones(); syncHandle();
+  });
+});
+
+// ─── Copy params ─────────────────────────────────────────────────────────────
+function copyParams() {
+  const v = id => parseFloat(document.getElementById(id).value).toFixed(1);
+  const ov = id => parseFloat(document.getElementById(id).value).toFixed(2);
+  const text =
+`// ── DragonScene.tsx — paste these values ──
+const MOUTH  = new THREE.Vector3(${v('mx')}, ${v('my')}, ${v('mz')})
+const IMPACT = new THREE.Vector3(${v('ix')}, ${v('iy')}, ${v('iz')})
+// MID is computed automatically as midpoint
+
+// ConeGeometry args: [radius, height, ...]
+// Core:  [${v('r1')}, auto]
+// Mid:   [${v('r2')}, auto]
+// Outer: [${v('r3')}, auto]
+// Length extension: ${v('ext')}
+
+// Opacities: core=${ov('o1')}, mid=${ov('o2')}, outer=${ov('o3')}
+// Sphere radii: mouth=${v('sr1')}, tip=${v('sr2')}`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    const el = document.getElementById('copied');
+    el.style.opacity = 1;
+    setTimeout(() => el.style.opacity = 0, 1800);
+  });
+}
+
+// ─── HUD ─────────────────────────────────────────────────────────────────────
+const pxE = document.getElementById('px'), pyE = document.getElementById('py'), pzE = document.getElementById('pz');
+const txE = document.getElementById('tx'), tyE = document.getElementById('ty'), tzE = document.getElementById('tz');
+function fmt(v) { return v.toFixed(1); }
+
+// ─── Animate ─────────────────────────────────────────────────────────────────
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.016;
+  controls.update();
+
+  // Subtle pulse on all additive meshes
+  if (coneMeshCore) {
+    const f = 1 + Math.sin(t * 14) * 0.06;
+    coneMeshCore.scale.setScalar(f);
+    coneMeshMid && coneMeshMid.scale.setScalar(f);
+  }
+
+  const p = camera.position, tg = controls.target;
+  pxE.textContent = fmt(p.x); pyE.textContent = fmt(p.y); pzE.textContent = fmt(p.z);
+  txE.textContent = fmt(tg.x); tyE.textContent = fmt(tg.y); tzE.textContent = fmt(tg.z);
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

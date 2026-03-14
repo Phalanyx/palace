@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import { Suspense, useRef, useMemo, useEffect } from 'react'
+import { Suspense, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 
 // ─── Coordinate note ────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ const KEYFRAMES: { pos: [number, number, number]; target: [number, number, numbe
   { pos: [-0.5, 22.5, -39.7], target: [-0.5, 22.5, -39.9] }
 ]
 
-const DWELL_SEC = 3.5
+const DWELL_SEC = 1.8
 const TRANSITION_SEC = 2.0
 const PER_SHOT = DWELL_SEC + TRANSITION_SEC
 const TOTAL_TIME = KEYFRAMES.length * PER_SHOT
@@ -90,170 +90,155 @@ function CameraRig() {
 
 function Dragon() {
   const { scene } = useGLTF('/models/wrath_of_the_dragon.glb')
+  const conesRef = useRef<THREE.Mesh[]>([])
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
+    const pulse = Math.sin(t * 1.6) * 0.12 + Math.sin(t * 3.1) * 0.05
+    conesRef.current.forEach((c, i) => {
+      const mat = c.material as THREE.MeshBasicMaterial
+      const base = i === 0 ? 0.18 : 0.12
+      mat.opacity = base + pulse
+    })
+  })
+
   useEffect(() => {
-    const tmp = new THREE.Vector3()
-    const box = new THREE.Box3()
+    const added: THREE.Object3D[] = []
+    conesRef.current = []
+
     scene.traverse((obj: THREE.Object3D) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        obj.getWorldPosition(tmp)
-        box.setFromObject(obj)
-        const c = new THREE.Vector3(); box.getCenter(c)
-        console.log(`[DEBUG] mesh: ${obj.name} | worldPos: (${tmp.x.toFixed(1)}, ${tmp.y.toFixed(1)}, ${tmp.z.toFixed(1)}) | boxCenter: (${c.x.toFixed(1)}, ${c.y.toFixed(1)}, ${c.z.toFixed(1)})`)
+      const mesh = obj as THREE.Mesh
+      if (!mesh.isMesh) return
+      const isBreath  = obj.name.toLowerCase().includes('magicspell')
+      const isWizard  = obj.name === 'Wizard_0' || obj.name === 'LeaderWarrior_0'
+      if (!isBreath && !isWizard) return
+      if (obj.children.some(c => c.name === '__breath_glow__')) return
+
+      const mat = mesh.material as THREE.MeshStandardMaterial
+      if (mat && 'emissive' in mat) {
+        if (isWizard) {
+          const wizMat = mat.clone()
+          wizMat.emissiveIntensity = 10.0
+          wizMat.toneMapped = false
+          mesh.material = wizMat
+        } else {
+          mat.emissive = new THREE.Color(0.1, 0.8, 1.0)
+          mat.emissiveIntensity = 3.5
+          mat.toneMapped = false
+        }
+      }
+
+      if (isWizard) {
+        // Additive layers — the emissive texture drives the color, these amplify it
+        for (const [color, opacity] of [
+          [new THREE.Color(0.2, 1.0, 0.4), 0.35],
+          [new THREE.Color(0.1, 0.6, 0.3), 0.20],
+        ] as [THREE.Color, number][]) {
+          const layer = new THREE.Mesh(
+            mesh.geometry,
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }),
+          )
+          layer.name = '__breath_glow__'
+          mesh.add(layer)
+          added.push(layer)
+        }
+        return
+      }
+
+      // Flat emissive overlay (same geometry, child of mesh = auto-aligned)
+      const overlay = new THREE.Mesh(
+        mesh.geometry,
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color(0.3, 0.9, 1.0),
+          transparent: true,
+          opacity: 0.45,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }),
+      )
+      overlay.name = '__breath_glow__'
+      mesh.add(overlay)
+      added.push(overlay)
+
+      // Extra glow layers using the same geometry — perfectly aligned by definition
+      for (const [color, opacity] of [
+        [new THREE.Color(0.2, 0.7, 1.0), 0.18],
+        [new THREE.Color(0.0, 0.5, 0.3), 0.12],
+      ] as [THREE.Color, number][]) {
+        const layer = new THREE.Mesh(
+          mesh.geometry,
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }),
+        )
+        layer.name = '__breath_glow__'
+        mesh.add(layer)
+        added.push(layer)
+        conesRef.current.push(layer)
       }
     })
+
+    return () => { added.forEach(o => o.parent?.remove(o)) }
   }, [scene])
   return <primitive object={scene} />
 }
 
-// Dragon breath: green dragon mouth ~ (-25, 10, 20), beam aimed at blast sphere ~ (-23, 28, 28)
-function DragonBreathEffect() {
-  const coreRef    = useRef<THREE.Mesh>(null)
-  const midRef     = useRef<THREE.Mesh>(null)
-  const outerRef   = useRef<THREE.Mesh>(null)
-  const glowRef    = useRef<THREE.Mesh>(null)
-  const light1Ref  = useRef<THREE.PointLight>(null)
-  const light2Ref  = useRef<THREE.PointLight>(null)
-  const light3Ref  = useRef<THREE.PointLight>(null)
+const BREATH_POS: [number, number, number] = [3.3, 20.4, -2.3]
+const SUN_POS: [number, number, number] = [68.7, 181.0, -330.2]
 
-  // Quaternion to rotate cone (default up-axis +Y) to face from mouth toward blast sphere
-  const quaternion = useMemo(() => {
-    const from  = new THREE.Vector3(-25, 10, 20)
-    const to    = new THREE.Vector3(-23, 28, 28)
-    const dir   = to.clone().sub(from).normalize()
-    const up    = new THREE.Vector3(0, 1, 0)
-    const q     = new THREE.Quaternion().setFromUnitVectors(up, dir)
-    return q
-  }, [])
+function SunGlow() {
+  const lightRef  = useRef<THREE.PointLight>(null)
+  const matsRef   = useRef<THREE.MeshBasicMaterial[]>([])
 
-  // Midpoint along the beam — where lights and cones are anchored
-  const beamMid   = new THREE.Vector3(-24, 19, 24)
-  const mouthPos  = new THREE.Vector3(-25, 10, 20)
-  const impactPos = new THREE.Vector3(-23, 28, 28)
+  const layers: [number, number, number][] = [
+    [30,  0xfff8e0, 0.85],
+    [55,  0xffcc44, 0.55],
+    [90,  0xff9900, 0.30],
+  ]
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
-    // fast flicker for the inner core
-    const flicker = 1 + Math.sin(t * 14) * 0.08 + Math.sin(t * 7.3) * 0.06
-    // slow breathe for outer glow
-    const breathe = 1 + Math.sin(t * 2.1) * 0.15
-
-    if (coreRef.current)  coreRef.current.scale.setScalar(flicker)
-    if (midRef.current)   midRef.current.scale.setScalar(flicker * 1.02)
-    if (outerRef.current) outerRef.current.scale.setScalar(breathe)
-    if (glowRef.current)  glowRef.current.scale.setScalar(breathe * 1.1)
-
-    // Modulate the main fill light intensity
-    if (light1Ref.current) light1Ref.current.intensity = 80 + Math.sin(t * 11) * 20
-    if (light2Ref.current) light2Ref.current.intensity = 40 + Math.sin(t * 7 + 1) * 12
-    if (light3Ref.current) light3Ref.current.intensity = 25 + Math.sin(t * 3.5 + 2) * 8
+    const pulse = Math.sin(t * 0.9) * 0.18 + Math.sin(t * 2.1) * 0.08
+    if (lightRef.current) lightRef.current.intensity = 80 + pulse * 80
+    matsRef.current.forEach((mat, i) => {
+      const base = layers[i][2]
+      mat.opacity = Math.max(0, base + pulse)
+    })
   })
 
   return (
-    <group>
-      {/* ── Lights ── */}
-      {/* Scorching white-cyan at mouth */}
-      <pointLight
-        ref={light1Ref}
-        position={mouthPos.toArray()}
-        color="#aaffff"
-        intensity={80}
-        distance={60}
-        decay={1.8}
-      />
-      {/* Main cyan fill along beam */}
-      <pointLight
-        ref={light2Ref}
-        position={beamMid.toArray()}
-        color="#00ddff"
-        intensity={40}
-        distance={50}
-        decay={1.6}
-      />
-      {/* Soft teal glow at blast impact */}
-      <pointLight
-        ref={light3Ref}
-        position={impactPos.toArray()}
-        color="#33eeff"
-        intensity={25}
-        distance={45}
-        decay={1.5}
-      />
-
-      {/* ── Beam cones ── all anchored at beam midpoint, oriented along beam axis ── */}
-
-      {/* Inner core — near-white, very bright */}
-      <mesh ref={coreRef} position={beamMid.toArray()} quaternion={quaternion}>
-        <coneGeometry args={[1.2, 22, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.92}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Mid layer — bright cyan */}
-      <mesh ref={midRef} position={beamMid.toArray()} quaternion={quaternion}>
-        <coneGeometry args={[2.4, 22, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#66ffff"
-          transparent
-          opacity={0.65}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Outer haze — wide soft cyan */}
-      <mesh ref={outerRef} position={beamMid.toArray()} quaternion={quaternion}>
-        <coneGeometry args={[4.5, 24, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#00ccff"
-          transparent
-          opacity={0.30}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Volumetric scatter glow sphere at mouth origin */}
-      <mesh position={mouthPos.toArray()}>
-        <sphereGeometry args={[3.5, 16, 16]} />
-        <meshBasicMaterial
-          color="#aaffff"
-          transparent
-          opacity={0.55}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Large diffuse corona at impact */}
-      <mesh ref={glowRef} position={impactPos.toArray()}>
-        <sphereGeometry args={[5.5, 16, 16]} />
-        <meshBasicMaterial
-          color="#33ddff"
-          transparent
-          opacity={0.35}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Tiny bright spark at mouth center */}
-      <mesh position={mouthPos.toArray()}>
-        <sphereGeometry args={[1.0, 12, 12]} />
-        <meshBasicMaterial
-          color="#ffffff"
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
+    <group position={SUN_POS}>
+      <pointLight ref={lightRef} color="#ffaa33" intensity={80} distance={500} decay={1.5} />
+      {layers.map(([r, color, opacity], i) => (
+        <mesh key={i}>
+          <sphereGeometry args={[r, 16, 16]} />
+          <meshBasicMaterial
+            ref={m => { if (m) matsRef.current[i] = m }}
+            color={color} transparent opacity={opacity}
+            blending={THREE.AdditiveBlending} depthWrite={false}
+          />
+        </mesh>
+      ))}
     </group>
+  )
+}
+
+function BreathLight() {
+  const lightRef = useRef<THREE.PointLight>(null)
+
+  useFrame(({ clock }) => {
+    if (!lightRef.current) return
+    const t = clock.getElapsedTime()
+    lightRef.current.intensity = 22 + Math.sin(t * 1.6) * 6 + Math.sin(t * 3.1) * 3
+  })
+
+  return (
+    <pointLight
+      ref={lightRef}
+      position={BREATH_POS}
+      color="#44ffcc"
+      intensity={22}
+      distance={70}
+      decay={2}
+    />
   )
 }
 
@@ -318,8 +303,9 @@ export default function DragonScene() {
         <directionalLight position={[5, 8, 5]} intensity={1.5} />
         <directionalLight position={[-5, 2, -5]} intensity={0.4} color="#8844ff" />
         <Dragon />
+        <BreathLight />
+        <SunGlow />
         <WizardLights />
-        <DragonBreathEffect />
         <CameraRig />
       </Suspense>
     </Canvas>
