@@ -18,12 +18,12 @@ const KEYFRAMES: { pos: [number, number, number]; target: [number, number, numbe
   { pos: [-71.7, 31.9, 121.1], target: [-20.0, 26.6, 17.2] },
   // 2 – pushed right into the blast sphere
   { pos: [-70.4, 31.3, 44.5], target: [-25.2, 28.9, 33.1] },
-  // 3 – low, looking steeply up at the dark dragon
-  { pos: [-25.3, 10.8, 18.7], target: [-23.6, 11.4, 19.7] },
+  // 3 – dragon's breath angle 1
+  { pos: [50.3, 5.7, 27.8], target: [-29.0, 0.0, 18.0] },
   // 4 – wider: full dragon silhouette over the castle
   { pos: [-26.3, 15.4, 21.8], target: [-26.3, 15.4, 0.0] },
-  // 5 – interior: wizard character with stairs
-  { pos: [33.3, 22.6, -2.2], target:  [-13.1, 18.7, 47.2] },
+  // 5 – dragon's breath angle 2
+  { pos: [-56.2, 0.8, 19.9], target: [-29.0, 0.0, 18.0] },
   // 6 – ground level: warrior struck by lightning, green dragon approaching
   { pos: [1.3, 5.2, 30.9], target: [1.3, 5.2, 30.7] },
   // 7 – under the green dragon's jaw (Dragon.001 root ~ (0.35, 2.4, -8.3))

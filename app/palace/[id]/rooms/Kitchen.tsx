@@ -6,11 +6,11 @@ import { mat, matMetal, matCopper, jitter, addMesh, makeTorch, animateFlicker, F
 import { DynamicObject } from '../DynamicObject';
 
 const KITCHEN_SLOTS: [number, number, number][] = [
-  [0, 2, 2.5],         // On the main prep table
-  [-5.5, 2, 3.5],      // On the side table 
+  [0, 2.8, 2.5],       // Floating above the main prep table
+  [-5.5, 2.6, 3.5],    // Floating above the side table
   [6, 3, 3],           // On top of the barrels
   [0, 8.5, -7],        // On top of the hearth
-  [-4.5, 2.5, -3]      // Hanging over the cauldron
+  [-4.5, 3.3, -3]      // Floating above the cauldron
 ];
 
 export function Kitchen({ objects = [], activeObjectIdx = -1, onCloseObject, onObjectOpen, onObjectClose, mode = 'learn' }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void; onObjectOpen?: (id: string) => void; onObjectClose?: (id: string) => void; mode?: 'learn' | 'test' }) {
