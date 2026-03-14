@@ -12,10 +12,12 @@ export async function POST(request: Request, context: any) {
     
     const palace = await prisma.palace.findUnique({
       where: { id: palaceId },
-      include: { objects: true }
+      include: { rooms: { include: { objects: true } } }
     })
 
-    if (!palace || palace.objects.length === 0) {
+    const allObjects = palace?.rooms.flatMap((r: any) => r.objects) || []
+
+    if (!palace || allObjects.length === 0) {
       return NextResponse.json({ error: 'Palace not found or has no objects' }, { status: 404 })
     }
 
@@ -23,7 +25,7 @@ export async function POST(request: Request, context: any) {
     const questions = []
 
     // 1. For each object, generate a question using Moorcheh for distinct chunk retrieval
-    for (const object of palace.objects) {
+    for (const object of allObjects) {
         
       // Use Moorcheh's search to find the most semantically distinct/surprising chunks
       let searchResults

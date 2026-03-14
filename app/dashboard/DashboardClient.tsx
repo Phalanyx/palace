@@ -70,7 +70,7 @@ export default function DashboardClient({ initialPalaces }: { initialPalaces: an
               <div className="flex justify-between items-start mb-4">
                 <StatusBadge status={palace.status} />
                 <span className="text-sm font-medium text-slate-400 bg-slate-50 px-2.5 py-1 rounded-xl">
-                  {palace._count?.objects || 0} objects
+                  {palace._count?.rooms || 0} rooms
                 </span>
               </div>
               <h3 className="text-xl font-bold text-indigo-950 font-['Baloo_2'] mb-2">{palace.title}</h3>
@@ -140,7 +140,7 @@ function NewPalaceDrawer({ onClose, onSuccess }: { onClose: () => void, onSucces
           title,
           prompt,
           status: 'processing',
-          _count: { objects: 0 },
+          _count: { rooms: 0 },
           createdAt: new Date().toISOString()
         })
       }

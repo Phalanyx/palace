@@ -16,7 +16,7 @@ model Palace {
   status       String        @default("processing") // processing | ready | error
   createdAt    DateTime      @default(now()) @map("created_at")
   documents    Document[]
-  objects      Object[]
+  rooms        Room[]
   testSessions TestSession[]
 
   @@map("palaces")
@@ -37,20 +37,31 @@ model Document {
   @@map("documents")
 }
 
-model Object {
+model Room {
   id          String   @id @default(uuid())
   palaceId    String   @map("palace_id")
   palace      Palace   @relation(fields: [palaceId], references: [id], onDelete: Cascade)
-  documentId  String   @map("document_id")
-  document    Document @relation(fields: [documentId], references: [id])
-  label       String
-  description String   @db.Text
-  modelKey    String   @map("model_key")  // book | scroll | crystal | orb | flask | key | coin | torch
-  colorHint   String?  @map("color_hint")
+  roomKey     String   @map("room_key")   // bedroom | great_hall | kitchen | library
+  orderIndex  Int      @map("order_index")
+  objects     Object[]
+  
+  @@map("rooms")
+}
+
+model Object {
+  id             String   @id @default(uuid())
+  roomId         String   @map("room_id")
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  documentId     String   @map("document_id")
+  document       Document @relation(fields: [documentId], references: [id])
+  label          String
+  description    String   @db.Text
+  modelKey       String   @map("model_key")  // book | scroll | crystal | orb | flask | key | coin | torch
+  colorHint      String?  @map("color_hint")
   orderIndex     Int      @map("order_index")
   sampleQuestion String?  @map("sample_question")
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("objects")
 }

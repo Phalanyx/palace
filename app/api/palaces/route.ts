@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       where: { userId },
       include: {
         _count: {
-          select: { objects: true }
+          select: { rooms: true }
         },
         testSessions: {
           orderBy: { startedAt: 'desc' },

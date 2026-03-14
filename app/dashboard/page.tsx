@@ -9,7 +9,7 @@ export default async function DashboardPage() {
     where: { userId: "test-user-id" },
     include: {
       _count: {
-        select: { objects: true }
+        select: { rooms: true }
       },
       testSessions: {
         orderBy: { startedAt: 'desc' },

@@ -8,31 +8,45 @@ import os from 'os'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })
 
-const objectSchema = {
+const palaceSchema = {
   type: Type.ARRAY,
   items: {
     type: Type.OBJECT,
     properties: {
-      label: { type: Type.STRING, description: "Short name, max 4 words" },
-      description: { type: Type.STRING, description: "2-3 sentence explanation" },
-      model_key: { 
-        type: Type.STRING, 
-        enum: ["book", "scroll", "crystal", "orb", "flask", "key", "coin", "torch"],
-        description: "Visual representation type"
+      room_key: {
+        type: Type.STRING,
+        enum: ["bedroom", "great_hall", "kitchen", "library"],
+        description: "Which 3D room environment to place these objects in"
       },
-      color_hint: { type: Type.STRING, description: "e.g., 'deep blue', 'warm amber'" },
-      order_index: { type: Type.INTEGER },
-      sample_question: { type: Type.STRING, description: "A test question evaluating the student's semantic understanding of this object's concept. E.g. 'What is the primary function of...'" },
-      metadata: {
-        type: Type.OBJECT,
-        properties: {
-          importance: { type: Type.STRING, enum: ["high", "medium", "low"] },
-          relationships: { type: Type.ARRAY, items: { type: Type.STRING } },
-          source_hint: { type: Type.STRING }
+      objects: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            label: { type: Type.STRING, description: "Short name, max 4 words" },
+            description: { type: Type.STRING, description: "2-3 sentence explanation" },
+            model_key: { 
+              type: Type.STRING, 
+              enum: ["book", "scroll", "crystal", "orb", "flask", "key", "coin", "torch"],
+              description: "Visual representation type"
+            },
+            color_hint: { type: Type.STRING, description: "e.g., 'deep blue', 'warm amber'" },
+            order_index: { type: Type.INTEGER },
+            sample_question: { type: Type.STRING, description: "A test question evaluating the student's semantic understanding of this object's concept." },
+            metadata: {
+              type: Type.OBJECT,
+              properties: {
+                importance: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                relationships: { type: Type.ARRAY, items: { type: Type.STRING } },
+                source_hint: { type: Type.STRING }
+              }
+            }
+          },
+          required: ["label", "description", "model_key", "order_index", "sample_question"]
         }
       }
     },
-    required: ["label", "description", "model_key", "order_index", "sample_question"]
+    required: ["room_key", "objects"]
   }
 }
 
@@ -115,13 +129,17 @@ export async function processDocuments(palaceId: string) {
       ${combinedTextArray.join('\n\n')}
     `
 
-    // 2. Call Gemini for Objects
+    // 2. Call Gemini to generate rooms + objects
     const systemPrompt = `
       You are building a memory palace. Given document text and a user's learning goal,
-      extract the most important concepts as memory palace objects.
+      organize the most important concepts into ROOMS of a medieval palace.
+      
+      Available rooms: bedroom, great_hall, kitchen, library.
+      You do NOT need to use all rooms. Choose 2-4 rooms that thematically fit the content.
+      Each room should contain 2-6 objects. Aim for 8-15 objects total across all rooms.
+      Group related concepts into the same room. Order objects within each room logically.
       
       User's learning goal: "${palace.prompt}"
-      Aim for 8-15 objects total, ordered by how a student would encounter them.
     `
 
     const response = await ai.models.generateContent({
@@ -131,33 +149,45 @@ export async function processDocuments(palaceId: string) {
       ],
       config: {
         responseMimeType: "application/json",
-        responseSchema: objectSchema
+        responseSchema: palaceSchema
       }
     })
 
     const responseText = response.text || "[]"
-    const generatedObjects = JSON.parse(responseText)
+    const generatedRooms = JSON.parse(responseText)
 
-    // 3. Save to database
-    // Ensure all objects are associated correctly
-    const objectsToCreate = generatedObjects.map((obj: any) => ({
-      palaceId: palace.id,
-      // For hackathon speed, link to first doc or a dummy doc if none exact
-      documentId: palace.documents[0]?.id || "dummy", 
-      label: obj.label,
-      description: obj.description,
-      modelKey: obj.model_key,
-      colorHint: obj.color_hint,
-      orderIndex: obj.order_index,
-      sampleQuestion: obj.sample_question,
-      metadata: obj.metadata
-    }))
-
-    // We can only create if we have a valid documentId due to foreign key constraints
+    // 3. Save rooms + objects to database
     if (palace.documents.length > 0) {
-      await prisma.object.createMany({
-        data: objectsToCreate
-      })
+      const allLabels: string[] = []
+
+      for (let ri = 0; ri < generatedRooms.length; ri++) {
+        const roomData = generatedRooms[ri]
+        
+        // Create Room
+        const room = await prisma.room.create({
+          data: {
+            palaceId: palace.id,
+            roomKey: roomData.room_key,
+            orderIndex: ri,
+          }
+        })
+
+        // Create Objects for this Room
+        const objectsData = roomData.objects.map((obj: any) => ({
+          roomId: room.id,
+          documentId: palace.documents[0]?.id || "dummy",
+          label: obj.label,
+          description: obj.description,
+          modelKey: obj.model_key,
+          colorHint: obj.color_hint,
+          orderIndex: obj.order_index,
+          sampleQuestion: obj.sample_question,
+          metadata: obj.metadata,
+        }))
+
+        await prisma.object.createMany({ data: objectsData })
+        allLabels.push(...objectsData.map((o: any) => o.label))
+      }
 
       // 4. Upload to Moorcheh Namespace
       const namespace = `${process.env.MOORCHEH_PREFIX || ''}Palace${palace.id}`
@@ -167,7 +197,7 @@ export async function processDocuments(palaceId: string) {
         ...chunk,
         metadata: {
           ...chunk.metadata,
-          objectLabels: objectsToCreate.map((o: any) => o.label)
+          objectLabels: allLabels
         }
       }))
 

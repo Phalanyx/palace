@@ -12,9 +12,10 @@ export async function POST(request: Request, context: any) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // Find the object to get its label and palaceId
+    // Find the object to get its label and palaceId (via room)
     const targetObject = await prisma.object.findUnique({
-      where: { id: objectId }
+      where: { id: objectId },
+      include: { room: true }
     })
 
     if (!targetObject) {
@@ -22,7 +23,7 @@ export async function POST(request: Request, context: any) {
     }
 
     // Call Moorcheh's /answer endpoint, scoped to this palace namespace
-    const namespace = `${process.env.MOORCHEH_PREFIX || ''}Palace${targetObject.palaceId}`
+    const namespace = `${process.env.MOORCHEH_PREFIX || ''}Palace${targetObject.room.palaceId}`
     const query = `Focusing on ${targetObject.label}: ${message}`
     
     const moorchehResponse = await askMoorcheh(namespace, query)

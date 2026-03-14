@@ -10,8 +10,13 @@ export async function GET(request: Request, context: any) {
       where: { id },
       include: {
         documents: true,
-        objects: {
-          orderBy: { orderIndex: 'asc' }
+        rooms: {
+          orderBy: { orderIndex: 'asc' as const },
+          include: {
+            objects: {
+              orderBy: { orderIndex: 'asc' as const }
+            }
+          }
         }
       }
     })
