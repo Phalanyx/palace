@@ -19,11 +19,13 @@ interface DynamicObjectProps {
     description: string;
     orderIndex: number;
     sampleQuestion?: string | null;
-    metadata?: { meshUrl?: string; [key: string]: any } | null;
+    metadata?: { meshUrl?: string; itemType?: string; [key: string]: any } | null;
     mesh?: { storageUrl: string } | null;
   };
   position: [number, number, number];
   forceOpen?: boolean;
+  onClose?: () => void;
+  mode?: 'learn' | 'test';
 }
 
 function PartMesh({ part }: { part: MeshPart }) {
@@ -62,7 +64,7 @@ const FALLBACK_PARTS: MeshPart[] = [
   { primitive: 'sphere', color: '#ff00ff', position: [0, 0, 0], scale: [1, 1, 1] },
 ];
 
-export function DynamicObject({ objectData, position, forceOpen = false }: DynamicObjectProps) {
+export function DynamicObject({ objectData, position, forceOpen = false, onClose, mode = 'learn' }: DynamicObjectProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHover] = useState(false);
   const [clicked, setClick] = useState(false);
@@ -149,34 +151,21 @@ export function DynamicObject({ objectData, position, forceOpen = false }: Dynam
                 fontSize: 11,
                 fontWeight: 700,
               }}>
-                Object {objectData.orderIndex}
+                {mode === 'test' ? '❓ Question' : (objectData.metadata?.itemType ?? objectData.label)}
               </span>
               <button
-                onClick={() => setClick(false)}
+                onClick={() => { setClick(false); onClose?.(); }}
                 style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }}
               >✕</button>
             </div>
             <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: parts[0]?.color ?? '#ff00ff' }}>
               {objectData.label}
             </h3>
-            <p style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: '#ccc' }}>
-              {objectData.description}
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#ccc' }}>
+              {mode === 'test'
+                ? (objectData.sampleQuestion ?? objectData.description)
+                : objectData.description}
             </p>
-            {objectData.sampleQuestion && (
-              <div style={{
-                background: 'rgba(255,255,255,0.06)',
-                borderRadius: 10,
-                padding: '8px 10px',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}>
-                <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Sample Question
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: '#e0e0e0', fontStyle: 'italic', lineHeight: 1.5 }}>
-                  {objectData.sampleQuestion}
-                </p>
-              </div>
-            )}
           </div>
         </Html>
       )}
