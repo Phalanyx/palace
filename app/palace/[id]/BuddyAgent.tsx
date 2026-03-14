@@ -483,7 +483,7 @@ export default function BuddyAgent({
                 )}
               </div>
               <div>
-                <p className="text-white font-semibold text-sm leading-none">Study Buddy</p>
+                <p className="text-white font-semibold text-sm leading-none">Ada</p>
                 <p className="text-white/60 text-xs mt-0.5">{statusText}</p>
               </div>
             </div>
