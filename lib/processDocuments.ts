@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai"
 import { prisma } from "./prisma"
 import { uploadToMoorcheh, createNamespace } from "./moorcheh"
 import { createClient } from '@supabase/supabase-js'
+import { generateAllMeshes } from "./meshGenerator"
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -23,30 +24,17 @@ const palaceSchema = {
         items: {
           type: Type.OBJECT,
           properties: {
-            label: { type: Type.STRING, description: "Short name, max 4 words" },
+            label: { type: Type.STRING, description: "Short concept name, max 4 words" },
             description: { type: Type.STRING, description: "2-3 sentence explanation" },
-            model_key: { 
-              type: Type.STRING, 
+            item_type: { type: Type.STRING, description: "A specific, evocative physical item that metaphorically represents this concept's meaning (e.g. 'Broken Compass' for lost direction, 'Cracked Hourglass' for time pressure, 'Twin-Edged Dagger' for duality). Must be UNIQUE across the entire palace — no two objects may share the same item type." },
+            model_key: {
+              type: Type.STRING,
               enum: ["book", "scroll", "crystal", "orb", "flask", "key", "coin", "torch"],
               description: "Visual representation type"
             },
             color_hint: { type: Type.STRING, description: "e.g., 'deep blue', 'warm amber'" },
             order_index: { type: Type.INTEGER },
             sample_question: { type: Type.STRING, description: "A test question evaluating the student's semantic understanding of this object's concept." },
-            mesh_parts: {
-              type: Type.ARRAY,
-              description: "Compound 3D mesh definition: 1-3 primitives composing this object. MUST reflect the ROOM CONTEXT first (e.g., kitchen → food/pots, bedroom → candles/crowns, library → books/scrolls, great_hall → swords/shields). Color must be shocking neon (#ff00ff, #00ffff, #ccff00, #ff6600) to stand out in a dark scene.",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  primitive: { type: Type.STRING, enum: ["box", "sphere", "cylinder", "cone", "torus", "icosahedron", "octahedron"] },
-                  color: { type: Type.STRING, description: "Hex color — MUST be a shocking neon like #ff00ff, #00ffff, #ccff00, #ff6600, #ff0066" },
-                  position: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] local offset from group center" },
-                  scale: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] scale. Keep reasonable: e.g. [0.5, 0.8, 0.5]" }
-                },
-                required: ["primitive", "color", "position", "scale"]
-              }
-            },
             metadata: {
               type: Type.OBJECT,
               properties: {
@@ -56,7 +44,7 @@ const palaceSchema = {
               }
             }
           },
-          required: ["label", "description", "model_key", "order_index", "sample_question", "mesh_parts"]
+          required: ["label", "description", "item_type", "model_key", "order_index", "sample_question"]
         }
       }
     },
@@ -147,28 +135,29 @@ export async function processDocuments(palaceId: string) {
     const systemPrompt = `
       You are building a memory palace. Given document text and a user's learning goal,
       organize the most important concepts into ROOMS of a medieval palace.
-      
+
       Available rooms: bedroom, great_hall, kitchen, library.
       You do NOT need to use all rooms. Choose 2-4 rooms that thematically fit the content.
       Each room MUST contain between 2 and 5 objects. NEVER EXCEED 5 OBJECTS PER ROOM.
-      Group related concepts into the same room. Order objects within each room logically.
-      
-      For each object, create 'mesh_parts': 1-3 primitives that form a recognizable thematic object.
-      
-      THE ROOM CONTEXT IS THE TOP PRIORITY for mesh shape:
-      - bedroom: pillow (flat box), crown (torus + cylinder), candle (thin cylinder + sphere top),
-                  ring (torus), goblet (cylinder + sphere base)
-      - great_hall: sword (tall thin cylinder + flat box hilt), shield (flat box), chalice (cylinder
-                    + inverted cone base), banner (flat box), axe (box + diamond icosahedron)
-      - kitchen: pot (cylinder + torus rim), bread loaf (sphere, squashed), apple (sphere + tiny
-                 cone stem), ladle (cylinder + sphere bowl), fish (icosahedron)
-      - library: open book (two thin boxes angled), scroll (cylinder), quill (cone + cylinder),
-                 lantern (cylinder + cone top), hourglass (two cones touching points)
-      
-      Use SHOCKING NEON COLORS: #ff00ff, #00ffff, #ccff00, #ff6600, #ff0088, #00ff88
-      so the user can immediately spot them against the dark medieval background.
-      Position parts relative to group center (object sits at y=0 by default).
-      
+      Group related concepts into the same room thematically. Order objects within each room logically.
+
+      ITEM SELECTION — this is the most important creative task:
+      For each concept, choose a UNIQUE physical item whose shape, nature, or symbolism reflects the concept's meaning.
+      Ignore the room entirely when picking the item. Focus on the IDEA.
+      Examples of concept → item mapping:
+      - "Natural Selection" → Cracked Fossil (icosahedron body + box slab base)
+      - "Supply & Demand" → Balance Scale (wide flat box beam + two cylinder pans hanging at ends)
+      - "Ohm's Law" → Lightning Rod (tall thin cylinder + cone tip + sphere base)
+      - "DNA Replication" → Double Helix (two intertwined torus rings + cylinder axis)
+      - "The Fall of Rome" → Broken Column (cylinder body + crumbled box chunks at y<0)
+      - "Photosynthesis" → Sun Crystal (icosahedron body + small cone rays around it)
+      - "Entropy" → Shattered Orb (central sphere + 3 small icosahedra offset outward)
+      - "Newton's First Law" → Iron Pendulum (sphere bob + thin cylinder rod)
+      - "Free Will" → Twin-Edged Dagger (tall thin box blade + flat box crossguard)
+      - "Time Dilation" → Warped Hourglass (two cones tip-to-tip, one stretched, cylinder waist)
+
+      UNIQUENESS: Every item_type across the ENTIRE palace must be different. No two concepts may share the same item.
+
       User's learning goal: "${palace.prompt}"
     `
 
@@ -186,14 +175,14 @@ export async function processDocuments(palaceId: string) {
     const responseText = response.text || "[]"
     const generatedRooms = JSON.parse(responseText)
 
-    // 3. Save rooms + objects to database
+    // 3. Phase 1 — Save rooms + objects to database (sequential)
     if (palace.documents.length > 0) {
       const allLabels: string[] = []
+      const savedObjects: { dbId: string; itemType: string; label: string; description: string; roomKey: string }[] = []
 
       for (let ri = 0; ri < generatedRooms.length; ri++) {
         const roomData = generatedRooms[ri]
-        
-        // Create Room
+
         const room = await prisma.room.create({
           data: {
             palaceId: palace.id,
@@ -202,33 +191,9 @@ export async function processDocuments(palaceId: string) {
           }
         })
 
-        // Create Objects for this Room
         for (let oi = 0; oi < roomData.objects.length; oi++) {
           const obj = roomData.objects[oi]
 
-          // Upload mesh_parts to Supabase Storage
-          let meshUrl: string | null = null
-          if (obj.mesh_parts && obj.mesh_parts.length > 0) {
-            console.log(`  Uploading mesh for "${obj.label}" (${obj.mesh_parts.length} parts, room: ${roomData.room_key})`)
-            const meshJson = JSON.stringify({ parts: obj.mesh_parts })
-            const meshPath = `meshes/${palace.id}/${room.id}-${oi}.json`
-            const { error: meshErr } = await supabase.storage
-              .from('palace-models')
-              .upload(meshPath, meshJson, { contentType: 'application/json', upsert: true })
-            if (meshErr) {
-              console.error(`  ❌ Mesh upload failed for "${obj.label}": ${meshErr.message}`)
-            } else {
-              const { data: urlData } = supabase.storage
-                .from('palace-models')
-                .getPublicUrl(meshPath)
-              meshUrl = urlData.publicUrl
-              console.log(`  ✅ Mesh uploaded: ${meshUrl}`)
-            }
-          } else {
-            console.warn(`  ⚠️ No mesh_parts for "${obj.label}" — falling back to default mesh`)
-          }
-
-          // Create Object record
           const createdObj = await prisma.object.create({
             data: {
               roomId: room.id,
@@ -239,26 +204,56 @@ export async function processDocuments(palaceId: string) {
               colorHint: obj.color_hint,
               orderIndex: obj.order_index,
               sampleQuestion: obj.sample_question,
-              metadata: obj.metadata ?? {},
+              metadata: { ...(obj.metadata ?? {}), itemType: obj.item_type ?? null },
             }
           })
 
-          // Create Mesh record in DB (if we have a storage URL)
-          if (meshUrl) {
-            await prisma.mesh.create({
-              data: {
-                objectId: createdObj.id,
-                storageUrl: meshUrl,
-                roomKey: roomData.room_key,
-              }
-            })
-          }
-
+          savedObjects.push({
+            dbId: createdObj.id,
+            itemType: obj.item_type,
+            label: obj.label,
+            description: obj.description,
+            roomKey: roomData.room_key,
+          })
           allLabels.push(createdObj.label)
         }
       }
 
-      // 4. Upload to Moorcheh Namespace
+      // 4. Phase 2 — Generate all meshes in a single batch Claude call, then upload
+      console.log(`Generating meshes for ${savedObjects.length} objects...`)
+      const allMeshes = await generateAllMeshes(
+        savedObjects.map(s => ({ id: s.dbId, itemType: s.itemType, label: s.label, description: s.description }))
+      )
+
+      for (const saved of savedObjects) {
+        const parts = allMeshes[saved.dbId] ?? [{ primitive: 'sphere' as const, color: '#ff00ff', position: [0, 0, 0] as [number, number, number], scale: [1.4, 1.4, 1.4] as [number, number, number] }]
+        const meshJson = JSON.stringify({ parts })
+        const meshPath = `meshes/${palace.id}/${saved.dbId}.json`
+
+        const { error: meshErr } = await supabase.storage
+          .from('palace-models')
+          .upload(meshPath, meshJson, { contentType: 'application/json', upsert: true })
+
+        if (meshErr) {
+          console.error(`  Mesh upload failed for "${saved.label}": ${meshErr.message}`)
+          continue
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('palace-models')
+          .getPublicUrl(meshPath)
+
+        await prisma.mesh.create({
+          data: {
+            objectId: saved.dbId,
+            storageUrl: urlData.publicUrl,
+            roomKey: saved.roomKey,
+          }
+        })
+        console.log(`  Mesh ready: ${saved.label} (${saved.itemType})`)
+      }
+
+      // 5. Upload to Moorcheh Namespace
       const namespace = `${process.env.MOORCHEH_PREFIX || ''}Palace${palace.id}`
       await createNamespace(namespace)
       

@@ -19,11 +19,12 @@ interface DynamicObjectProps {
     description: string;
     orderIndex: number;
     sampleQuestion?: string | null;
-    metadata?: { meshUrl?: string; [key: string]: any } | null;
+    metadata?: { meshUrl?: string; itemType?: string; [key: string]: any } | null;
     mesh?: { storageUrl: string } | null;
   };
   position: [number, number, number];
   forceOpen?: boolean;
+  onClose?: () => void;
 }
 
 function PartMesh({ part }: { part: MeshPart }) {
@@ -62,7 +63,7 @@ const FALLBACK_PARTS: MeshPart[] = [
   { primitive: 'sphere', color: '#ff00ff', position: [0, 0, 0], scale: [1, 1, 1] },
 ];
 
-export function DynamicObject({ objectData, position, forceOpen = false }: DynamicObjectProps) {
+export function DynamicObject({ objectData, position, forceOpen = false, onClose }: DynamicObjectProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHover] = useState(false);
   const [clicked, setClick] = useState(false);
@@ -149,10 +150,10 @@ export function DynamicObject({ objectData, position, forceOpen = false }: Dynam
                 fontSize: 11,
                 fontWeight: 700,
               }}>
-                Object {objectData.orderIndex}
+                {objectData.metadata?.itemType ?? objectData.label}
               </span>
               <button
-                onClick={() => setClick(false)}
+                onClick={() => { setClick(false); onClose?.(); }}
                 style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }}
               >✕</button>
             </div>

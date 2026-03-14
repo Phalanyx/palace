@@ -13,7 +13,7 @@ const LIBRARY_SLOTS: [number, number, number][] = [
   [2.5, 2.5, 4]        // On the right reading desk
 ];
 
-export function Library({ objects = [], activeObjectIdx = -1 }: { objects?: any[]; activeObjectIdx?: number }) {
+export function Library({ objects = [], activeObjectIdx = -1, onCloseObject }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void }) {
   const crystalRef = useRef<THREE.Mesh>(null);
   const crystInnerRef = useRef<THREE.Mesh>(null);
 
@@ -276,7 +276,7 @@ export function Library({ objects = [], activeObjectIdx = -1 }: { objects?: any[
 
       {/* Dynamic Objects */}
       {objects.slice(0, 5).map((obj, i) => (
-        <DynamicObject key={obj.id} objectData={obj} position={LIBRARY_SLOTS[i]} forceOpen={i === activeObjectIdx} />
+        <DynamicObject key={obj.id} objectData={obj} position={LIBRARY_SLOTS[i]} forceOpen={i === activeObjectIdx} onClose={onCloseObject} />
       ))}
     </>
   );

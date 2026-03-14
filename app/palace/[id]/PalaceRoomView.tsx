@@ -37,7 +37,7 @@ const ROOM_LABELS: Record<string, string> = {
   library: '📚 Library',
 };
 
-type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number }>;
+type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number; onCloseObject?: () => void }>;
 
 const ROOM_COMPONENTS: Record<string, RoomFC> = {
   bedroom: Bedroom as RoomFC,
@@ -168,6 +168,7 @@ export default function PalaceRoomView({ rooms }: { rooms: Room[] }) {
                     <RoomComponent
                       objects={objects}
                       activeObjectIdx={activeObjectIdx}
+                      onCloseObject={() => setActiveObjectIdx(-1)}
                     />
                   )}
                 </Suspense>
