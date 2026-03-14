@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
 import { ArrowLeft, FileText, BrainCircuit } from 'lucide-react';
 import Link from 'next/link';
 import TestHistory from '../TestHistory';
@@ -9,13 +8,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function HistoryPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const user = await requireUser();
 
-  const palace = await prisma.palace.findFirst({
-    where: {
-      id: params.id,
-      userId: user.id,
-    },
+  const palace = await prisma.palace.findUnique({
+    where: { id: params.id },
     include: { documents: true },
   });
 
@@ -54,7 +49,7 @@ export default async function HistoryPage(props: { params: Promise<{ id: string 
             <FileText className="opacity-80" /> Sources
           </h2>
           <p className="opacity-90 font-medium">
-            {palace.documents.map((document) => document.fileName).join(', ') || 'No documents attached'}
+            {palace.documents.map((d: any) => d.fileName).join(', ') || 'No documents attached'}
           </p>
         </div>
 
