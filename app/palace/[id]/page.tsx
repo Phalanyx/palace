@@ -4,6 +4,7 @@ import { ArrowLeft, BrainCircuit, FileText, Activity } from 'lucide-react';
 import Link from 'next/link';
 import PalaceRoomView from './PalaceRoomView';
 import TestFlow from './TestFlow';
+import TestHistory from './TestHistory';
 
 // Dynamically rendered to fetch fresh palace data
 export const dynamic = 'force-dynamic';
@@ -110,6 +111,9 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
 
         {/* Quiz / Grading */}
         <TestFlow palaceId={palace.id} />
+
+        {/* Test History */}
+        <TestHistory palaceId={palace.id} />
 
         {/* Sources Footer */}
         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-8 shadow-[0_8px_0_0_rgba(79,70,229,0.5)] text-white relative overflow-hidden group">

@@ -13,7 +13,7 @@ const KITCHEN_SLOTS: [number, number, number][] = [
   [-4.5, 2.5, -3]      // Hanging over the cauldron
 ];
 
-export function Kitchen({ objects = [] }: { objects?: any[] }) {
+export function Kitchen({ objects = [], activeObjectIdx = -1 }: { objects?: any[]; activeObjectIdx?: number }) {
   const { group, fl } = useMemo(() => {
     const p = new THREE.Group();
     const fl: FlickerItem[] = [];
@@ -267,7 +267,7 @@ export function Kitchen({ objects = [] }: { objects?: any[] }) {
 
       {/* Dynamic Objects */}
       {objects.slice(0, 5).map((obj, i) => (
-        <DynamicObject key={obj.id} objectData={obj} position={KITCHEN_SLOTS[i]} />
+        <DynamicObject key={obj.id} objectData={obj} position={KITCHEN_SLOTS[i]} forceOpen={i === activeObjectIdx} />
       ))}
     </>
   );
