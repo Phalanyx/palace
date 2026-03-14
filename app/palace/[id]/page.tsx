@@ -19,6 +19,9 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
           }
         }
       },
+      documents: {
+        select: { fileName: true, rawText: true }
+      },
     }
   });
 
@@ -41,6 +44,11 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
     }))
   }));
 
+  const palaceDocuments = palace.documents.map((d: any) => ({
+    rawText: d.rawText ?? null,
+    fileName: d.fileName ?? null,
+  }));
+
   return (
     <div className="h-screen overflow-hidden font-['Comic_Neue']">
       <PalaceRoomView
@@ -48,6 +56,7 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
         palaceId={palace.id}
         palaceTitle={palace.title}
         palacePrompt={palace.prompt}
+        palaceDocuments={palaceDocuments}
       />
     </div>
   );
