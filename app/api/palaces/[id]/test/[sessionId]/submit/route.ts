@@ -1,42 +1,20 @@
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
-import { requireApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { GoogleGenAI } from '@google/genai'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' })
 
-type GradingAnswer = {
-  objectId: string
-  questionText: string
-  correctAnswer: string
-  userAnswer: string
-}
-
-type GradedAnswer = GradingAnswer & {
-  score: number
-  feedback: string
-}
-
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string; sessionId: string }> }
-) {
+export async function POST(request: Request, context: any) {
   try {
-    const auth = await requireApiUser()
-    if (!auth.user) {
-      return auth.response
-    }
-
     const params = await context.params
     const { sessionId } = params
     const body = await request.json()
     const { answers, gradingInstructions } = body as {
-      answers: GradingAnswer[]
+      answers: { objectId: string; questionText: string; correctAnswer: string; userAnswer: string }[]
       gradingInstructions: string
     }
 
-    const gradedItems: GradedAnswer[] = await Promise.all(
+    const gradedItems = await Promise.all(
       answers.map(async (a) => {
         const prompt = `
 You are grading a student's written answer for a memory palace quiz.
@@ -85,19 +63,7 @@ Respond ONLY as valid JSON, no markdown:
     const maxScore = gradedItems.length * 5
     const scorePct = maxScore > 0 ? (totalScore / maxScore) * 100 : 0
 
-    const existingSession = await prisma.testSession.findFirst({
-      where: {
-        id: sessionId,
-        palace: {
-          userId: auth.user.id,
-        },
-      },
-    })
-
-    if (!existingSession) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
-    }
-
+    // Update session with graded results
     await prisma.testSession.update({
       where: { id: sessionId },
       data: {
@@ -115,14 +81,13 @@ Respond ONLY as valid JSON, no markdown:
             score: g.score,
             aiFeedback: g.feedback,
           }))
-        } as Prisma.InputJsonValue,
+        } as any,
       }
     })
 
     return NextResponse.json({ gradedItems, scorePct, totalScore, maxScore })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error grading test session:', error)
-    const message = error instanceof Error ? error.message : 'Failed to grade'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Failed to grade' }, { status: 500 })
   }
 }

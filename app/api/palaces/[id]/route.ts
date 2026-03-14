@@ -1,25 +1,13 @@
 import { NextResponse } from 'next/server'
-import { requirePalaceAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(
-  _request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, context: any) {
   try {
-    const params = await context.params
+    const { params } = context
     const id = params.id
     
-    const auth = await requirePalaceAccess(id)
-    if (!auth.palace) {
-      return auth.response
-    }
-
-    const palace = await prisma.palace.findFirst({
-      where: {
-        id,
-        userId: auth.user.id,
-      },
+    const palace = await prisma.palace.findUnique({
+      where: { id },
       include: {
         documents: true,
         rooms: {
@@ -33,6 +21,10 @@ export async function GET(
         }
       }
     })
+
+    if (!palace) {
+      return NextResponse.json({ error: 'Palace not found' }, { status: 404 })
+    }
 
     return NextResponse.json({ palace })
   } catch (error) {
