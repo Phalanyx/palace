@@ -85,7 +85,13 @@ function CameraTargetAnimator({
   return null;
 }
 
-export default function PalaceRoomView({ rooms }: { rooms: Room[] }) {
+interface PalaceRoomViewProps {
+  rooms: Room[];
+  onRoomChange?: (room: Room) => void;
+  onObjectSelect?: (obj: RoomObject | null) => void;
+}
+
+export default function PalaceRoomView({ rooms, onRoomChange, onObjectSelect }: PalaceRoomViewProps) {
   const [activeView, setActiveView] = useState<string>('exterior');
   const [activeObjectIdx, setActiveObjectIdx] = useState<number>(0);
   const controlsRef = useRef<any>(null);
@@ -97,20 +103,27 @@ export default function PalaceRoomView({ rooms }: { rooms: Room[] }) {
   const slots = activeView !== 'exterior' ? (ROOM_SLOTS[activeView] || []) : [];
   const objects = activeRoom?.objects || [];
 
-  // When room changes, reset object index
+  // When room changes, reset object index and notify parent
   useEffect(() => {
     setActiveObjectIdx(0);
     if (cameraConfig) {
       cameraTargetRef.current.set(...cameraConfig.target);
     }
+    const room = rooms.find(r => r.roomKey === activeView);
+    if (room) {
+      onRoomChange?.(room);
+      onObjectSelect?.(null);
+    }
   }, [activeView]);
 
-  // When active object changes, animate camera to that slot
+  // When active object changes, animate camera and notify parent
   useEffect(() => {
     if (slots[activeObjectIdx]) {
       const [x, y, z] = slots[activeObjectIdx];
       cameraTargetRef.current.set(x, y, z);
     }
+    const obj = objects[activeObjectIdx] ?? null;
+    onObjectSelect?.(obj);
   }, [activeObjectIdx, activeView]);
 
   const currentObj = objects[activeObjectIdx];

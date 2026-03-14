@@ -2,8 +2,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { ArrowLeft, BrainCircuit, FileText, Activity } from 'lucide-react';
 import Link from 'next/link';
-import PalaceRoomView from './PalaceRoomView';
-import TestFlow from './TestFlow';
+import PalaceInteractiveSection from './PalaceInteractiveSection';
 import TestHistory from './TestHistory';
 
 // Dynamically rendered to fetch fresh palace data
@@ -24,7 +23,13 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
           }
         }
       },
-      documents: true,
+      documents: {
+        select: {
+          id: true,
+          fileName: true,
+          rawText: true,
+        }
+      },
       testSessions: {
         orderBy: { startedAt: 'desc' },
         take: 1
@@ -106,11 +111,19 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
           </div>
         </div>
 
-        {/* Room View (Client Component) */}
-        <PalaceRoomView rooms={roomsData} />
-
-        {/* Quiz / Grading */}
-        <TestFlow palaceId={palace.id} />
+        {/* Interactive section: room view + test + buddy agent */}
+        <PalaceInteractiveSection
+          palace={{
+            title: palace.title,
+            prompt: palace.prompt,
+            documents: palace.documents.map((d: any) => ({
+              rawText: d.rawText ?? null,
+              fileName: d.fileName ?? null,
+            })),
+          }}
+          rooms={roomsData}
+          palaceId={palace.id}
+        />
 
         {/* Test History */}
         <TestHistory palaceId={palace.id} />
