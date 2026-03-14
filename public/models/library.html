@@ -228,15 +228,22 @@ A(J(new THREE.CylinderGeometry(.3,.4,1.2,6),.03),mt(C.sL),0,1.5,0,0,0,0,0,0,0,ar
 A(J(new THREE.BoxGeometry(.7,.15,.7),.02),mt(C.sM),0,2.15,0,0,Math.PI/4,0,0,0,0,arch);
 
 // ====== CRYSTAL ======
-const crystalMat=new THREE.MeshStandardMaterial({color:C.crystal,flatShading:true,roughness:.1,metalness:.3,transparent:true,opacity:.8,emissive:C.crystalGlow,emissiveIntensity:.5});
-const crys=A(J(new THREE.OctahedronGeometry(0.7,0),.05),crystalMat,0,3.2,0,0,0,0,0,0,0,arch);
-// Crystal inner glow
-const crystInner=A(new THREE.OctahedronGeometry(.5,0),glow(C.crystalL,.6),0,3.2,0,0,0,0,0,0,0,arch);
+const crystalMat=new THREE.MeshStandardMaterial({color:0x2255aa,flatShading:true,roughness:.03,metalness:.75,transparent:true,opacity:.88,emissive:0x2266dd,emissiveIntensity:2.2});
+// Elongated drop-shaped gem: sphere geo with low segments for large visible facets, scaled taller
+const crys=A(J(new THREE.SphereGeometry(.88,8,6),.06),crystalMat,0,3.4,0,0,0,0,1,1.55,1,arch);
+// Crystal mid glow layer - bright blue
+const crystInner=A(new THREE.SphereGeometry(.62,7,5),new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:.75}),0,3.4,0,0,0,0,1,1.4,1,arch);
+// Crystal bright white-blue core
+const crystCore=A(new THREE.SphereGeometry(.32,6,5),new THREE.MeshBasicMaterial({color:0xddeeff,transparent:true,opacity:.97}),0,3.55,0,0,0,0,1,1.2,1,arch);
+// Tiny white hot center
+const crystHot=A(new THREE.SphereGeometry(.14,5,4),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1}),0,3.6,0,0,0,0,1,1,1,arch);
 
 arch.position.set(0,0,0);scene.add(arch);
 
-// Crystal light
-const crystLight=new THREE.PointLight(C.crystal,3,12);crystLight.position.set(0,3.5,0);scene.add(crystLight);
+// Crystal light - strong blue-white
+const crystLight=new THREE.PointLight(0x88bbff,6,16);crystLight.position.set(0,3.8,0);scene.add(crystLight);
+// Secondary warm fill from below
+const crystLight2=new THREE.PointLight(0x4488ff,3,8);crystLight2.position.set(0,2.2,0);scene.add(crystLight2);
 
 // Small cyan orbs around archway
 for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;
@@ -347,7 +354,7 @@ const sf2=new THREE.PointLight(0xff8844,.6,10);sf2.position.set(6,3,0);scene.add
 // Cool fill from above for contrast
 const cool=new THREE.DirectionalLight(0x3344aa,.15);cool.position.set(0,12,0);scene.add(cool);
 // Crystal uplighting
-const upL=new THREE.PointLight(C.crystal,1.5,8);upL.position.set(0,1,0);scene.add(upL);
+const upL=new THREE.PointLight(0x66aaff,2.5,10);upL.position.set(0,1,0);scene.add(upL);
 fl.push({light:upL,baseIntensity:1.5,idx:105});
 
 // ====== ORBIT ======
@@ -366,9 +373,14 @@ function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime()
 // Crystal rotation + pulse
 crys.rotation.y=t*.3;crys.rotation.x=Math.sin(t*.5)*.1;
 crystInner.rotation.y=-t*.5;crystInner.rotation.z=t*.2;
+crystCore.rotation.y=t*.4;crystCore.rotation.z=Math.sin(t*.7)*.08;
 const pulse=.7+Math.sin(t*2)*.3;
-crys.material.emissiveIntensity=.3+pulse*.3;
-crystInner.material.opacity=.4+pulse*.2;
+crys.material.emissiveIntensity=1.6+pulse*.8;
+crystInner.material.opacity=.6+pulse*.2;
+crystCore.material.opacity=.88+pulse*.1;
+crystHot.scale.setScalar(.9+pulse*.15);
+crystLight.intensity=4.5+pulse*2.5;
+crystLight2.intensity=2+pulse*1.5;
 // Flicker
 fl.forEach(f=>{const n=f.idx||0;
 if(f.light){const b=f.baseIntensity||1;f.light.intensity=b+Math.sin(t*7+n)*b*.18+Math.sin(t*13+n*2)*b*.12;}

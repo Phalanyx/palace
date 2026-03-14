@@ -10,6 +10,7 @@
     "init-bucket": "node scripts/init-bucket.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/vertex-sdk": "^0.14.4",
     "@google/genai": "^1.45.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
@@ -19,6 +20,7 @@
     "@supabase/supabase-js": "^2.99.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.3.1",
+    "google-auth-library": "^10.6.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "react": "19.2.3",

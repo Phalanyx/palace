@@ -13,7 +13,7 @@ const BEDROOM_SLOTS: [number, number, number][] = [
   [6, 5, -5]           // On the bookshelf
 ];
 
-export function Bedroom({ objects = [] }: { objects?: any[] }) {
+export function Bedroom({ objects = [], activeObjectIdx = -1, onCloseObject }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void }) {
   const { group, candles, torches } = useMemo(() => {
     const parent = new THREE.Group();
     const candlesList: any[] = [];
@@ -311,7 +311,7 @@ export function Bedroom({ objects = [] }: { objects?: any[] }) {
 
       {/* Dynamic Objects */}
       {objects.slice(0, 5).map((obj, i) => (
-        <DynamicObject key={obj.id} objectData={obj} position={BEDROOM_SLOTS[i]} />
+        <DynamicObject key={obj.id} objectData={obj} position={BEDROOM_SLOTS[i]} forceOpen={i === activeObjectIdx} onClose={onCloseObject} />
       ))}
     </>
   );
