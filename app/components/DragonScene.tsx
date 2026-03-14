@@ -40,7 +40,7 @@ const KEYFRAMES: { pos: [number, number, number]; target: [number, number, numbe
   { pos: [-0.5, 22.5, -39.7], target: [-0.5, 22.5, -39.9] }
 ]
 
-const DWELL_SEC = 3.5
+const DWELL_SEC = 1.8
 const TRANSITION_SEC = 2.0
 const PER_SHOT = DWELL_SEC + TRANSITION_SEC
 const TOTAL_TIME = KEYFRAMES.length * PER_SHOT
@@ -90,19 +90,113 @@ function CameraRig() {
 
 function Dragon() {
   const { scene } = useGLTF('/models/wrath_of_the_dragon.glb')
+  const conesRef = useRef<THREE.Mesh[]>([])
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
+    const pulse = Math.sin(t * 1.6) * 0.12 + Math.sin(t * 3.1) * 0.05
+    conesRef.current.forEach((c, i) => {
+      const mat = c.material as THREE.MeshBasicMaterial
+      const base = i === 0 ? 0.18 : 0.12
+      mat.opacity = base + pulse
+    })
+  })
+
   useEffect(() => {
-    const tmp = new THREE.Vector3()
-    const box = new THREE.Box3()
+    const added: THREE.Object3D[] = []
+    conesRef.current = []
+
     scene.traverse((obj: THREE.Object3D) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        obj.getWorldPosition(tmp)
-        box.setFromObject(obj)
-        const c = new THREE.Vector3(); box.getCenter(c)
-        console.log(`[DEBUG] mesh: ${obj.name} | worldPos: (${tmp.x.toFixed(1)}, ${tmp.y.toFixed(1)}, ${tmp.z.toFixed(1)}) | boxCenter: (${c.x.toFixed(1)}, ${c.y.toFixed(1)}, ${c.z.toFixed(1)})`)
+      const mesh = obj as THREE.Mesh
+      if (!mesh.isMesh) return
+      if (!obj.name.toLowerCase().includes('magicspell')) return
+      if (obj.children.some(c => c.name === '__breath_glow__')) return
+
+      const mat = mesh.material as THREE.MeshStandardMaterial
+      if (mat && 'emissive' in mat) {
+        mat.emissive = new THREE.Color(0.1, 0.8, 1.0)
+        mat.emissiveIntensity = 3.5
+        mat.toneMapped = false
+      }
+
+      // Flat emissive overlay (same geometry, child of mesh = auto-aligned)
+      const overlay = new THREE.Mesh(
+        mesh.geometry,
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color(0.3, 0.9, 1.0),
+          transparent: true,
+          opacity: 0.45,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        }),
+      )
+      overlay.name = '__breath_glow__'
+      mesh.add(overlay)
+      added.push(overlay)
+
+      // Extra glow layers using the same geometry — perfectly aligned by definition
+      for (const [color, opacity] of [
+        [new THREE.Color(0.2, 0.7, 1.0), 0.18],
+        [new THREE.Color(0.0, 0.5, 0.3), 0.12],
+      ] as [THREE.Color, number][]) {
+        const layer = new THREE.Mesh(
+          mesh.geometry,
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }),
+        )
+        layer.name = '__breath_glow__'
+        mesh.add(layer)
+        added.push(layer)
+        conesRef.current.push(layer)
       }
     })
+
+    return () => { added.forEach(o => o.parent?.remove(o)) }
   }, [scene])
   return <primitive object={scene} />
+}
+
+const BREATH_POS: [number, number, number] = [3.3, 20.4, -2.3]
+const SUN_POS: [number, number, number] = [68.7, 181.0, -330.2]
+
+function SunGlow() {
+  return (
+    <group position={SUN_POS}>
+      <pointLight color="#ffaa33" intensity={30} distance={300} decay={2} />
+      {/* Stacked additive spheres — fakes bloom around the sun disc */}
+      {([
+        [30,  0xfff8e0, 0.60],
+        [55,  0xffcc44, 0.32],
+        [90,  0xff9900, 0.16],
+        [140, 0xff6600, 0.07],
+      ] as [number, number, number][]).map(([r, color, opacity], i) => (
+        <mesh key={i}>
+          <sphereGeometry args={[r, 16, 16]} />
+          <meshBasicMaterial color={color} transparent opacity={opacity} blending={THREE.AdditiveBlending} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+function BreathLight() {
+  const lightRef = useRef<THREE.PointLight>(null)
+
+  useFrame(({ clock }) => {
+    if (!lightRef.current) return
+    const t = clock.getElapsedTime()
+    lightRef.current.intensity = 22 + Math.sin(t * 1.6) * 6 + Math.sin(t * 3.1) * 3
+  })
+
+  return (
+    <pointLight
+      ref={lightRef}
+      position={BREATH_POS}
+      color="#44ffcc"
+      intensity={22}
+      distance={70}
+      decay={2}
+    />
+  )
 }
 
 // Wizard is at approximately (0, -1, 0) in Three.js world space
@@ -166,6 +260,8 @@ export default function DragonScene() {
         <directionalLight position={[5, 8, 5]} intensity={1.5} />
         <directionalLight position={[-5, 2, -5]} intensity={0.4} color="#8844ff" />
         <Dragon />
+        <BreathLight />
+        <SunGlow />
         <WizardLights />
         <CameraRig />
       </Suspense>

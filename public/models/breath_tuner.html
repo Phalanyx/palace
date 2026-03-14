@@ -94,11 +94,12 @@ button:hover { background: #252540; }
   cam pos: [<span id="px">0</span>, <span id="py">0</span>, <span id="pz">0</span>]<br>
   target:  [<span id="tx">0</span>, <span id="ty">0</span>, <span id="tz">0</span>]
 </div>
-<div id="info">drag to orbit · scroll to zoom · right-drag to pan</div>
+<div id="info">drag gizmo to move breath · orbit outside gizmo · scroll to zoom · Esc to reset</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
 <script>
 // ─── Scene setup ────────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
@@ -130,6 +131,75 @@ dir2.position.set(-5, 2, -5); scene.add(dir2);
 // Load GLB
 const loader = new THREE.GLTFLoader();
 loader.load('./wrath_of_the_dragon.glb', gltf => { scene.add(gltf.scene); });
+
+// ─── Transform controls (drag handle) ────────────────────────────────────────
+// Invisible sphere sitting at beamMid — drag it to move the whole breath group
+const handle = new THREE.Mesh(
+  new THREE.SphereGeometry(1.5, 8, 8),
+  new THREE.MeshBasicMaterial({ visible: false })
+);
+scene.add(handle);
+
+const transformControls = new THREE.TransformControls(camera, renderer.domElement);
+transformControls.attach(handle);
+transformControls.setMode('translate');
+scene.add(transformControls);
+
+// While dragging, disable orbit so they don't fight
+transformControls.addEventListener('dragging-changed', e => {
+  controls.enabled = !e.value;
+});
+
+// Track offset between handle and mouth/impact so the whole group moves together
+let offsetMouthFromMid = new THREE.Vector3();
+let offsetImpactFromMid = new THREE.Vector3();
+
+transformControls.addEventListener('mouseDown', () => {
+  const mx = parseFloat(document.getElementById('mx').value);
+  const my = parseFloat(document.getElementById('my').value);
+  const mz = parseFloat(document.getElementById('mz').value);
+  const ix = parseFloat(document.getElementById('ix').value);
+  const iy = parseFloat(document.getElementById('iy').value);
+  const iz = parseFloat(document.getElementById('iz').value);
+  const mouth  = new THREE.Vector3(mx, my, mz);
+  const impact = new THREE.Vector3(ix, iy, iz);
+  offsetMouthFromMid  = mouth.clone().sub(handle.position);
+  offsetImpactFromMid = impact.clone().sub(handle.position);
+});
+
+transformControls.addEventListener('change', () => {
+  if (!transformControls.dragging) return;
+  const h = handle.position;
+  const newMouth  = h.clone().add(offsetMouthFromMid);
+  const newImpact = h.clone().add(offsetImpactFromMid);
+
+  // Update sliders + number boxes
+  [['mx', newMouth.x],['my', newMouth.y],['mz', newMouth.z],
+   ['ix', newImpact.x],['iy', newImpact.y],['iz', newImpact.z]
+  ].forEach(([id, val]) => {
+    document.getElementById(id).value = val;
+    document.getElementById(id + '_v').value = val.toFixed(1);
+  });
+
+  buildCones();
+});
+
+// Sync handle to beamMid whenever sliders change
+function syncHandle() {
+  const mx = parseFloat(document.getElementById('mx').value);
+  const my = parseFloat(document.getElementById('my').value);
+  const mz = parseFloat(document.getElementById('mz').value);
+  const ix = parseFloat(document.getElementById('ix').value);
+  const iy = parseFloat(document.getElementById('iy').value);
+  const iz = parseFloat(document.getElementById('iz').value);
+  handle.position.set((mx+ix)/2, (my+iy)/2, (mz+iz)/2);
+}
+syncHandle();
+
+// Press T = translate, R = rotate (rotate spins the whole cone direction not supported yet, so just translate)
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') transformControls.reset();
+});
 
 // ─── Breath cone group ───────────────────────────────────────────────────────
 const breathGroup = new THREE.Group();
@@ -226,12 +296,12 @@ ids.forEach(id => {
 
   slider.addEventListener('input', () => {
     valBox.value = parseFloat(slider.value).toFixed(id.startsWith('o') ? 2 : 1);
-    buildCones();
+    buildCones(); syncHandle();
   });
   valBox.addEventListener('change', () => {
     slider.value = parseFloat(valBox.value);
     valBox.value = parseFloat(valBox.value).toFixed(id.startsWith('o') ? 2 : 1);
-    buildCones();
+    buildCones(); syncHandle();
   });
 });
 

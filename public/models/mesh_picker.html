@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a12; overflow: hidden; font-family: monospace; }
+canvas { display: block; }
+#hud {
+  position: fixed; top: 14px; left: 14px;
+  background: rgba(0,0,0,0.85); color: #00ff88;
+  font-size: 13px; padding: 12px 16px; border-radius: 8px;
+  line-height: 2; border: 1px solid rgba(0,255,136,0.2);
+  pointer-events: none; z-index: 10;
+}
+#hud span { color: #fff; }
+#hud .dim { color: #666; }
+#clicked {
+  position: fixed; bottom: 50px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9); border: 1px solid #00ff88;
+  color: #00ff88; font-family: monospace; font-size: 14px;
+  padding: 10px 20px; border-radius: 8px;
+  z-index: 10; pointer-events: none;
+  opacity: 0; transition: opacity 0.2s;
+}
+#info {
+  position: fixed; bottom: 14px; left: 50%;
+  transform: translateX(-50%);
+  color: #444; font-size: 11px; font-family: monospace; z-index: 10;
+}
+#copy-sun {
+  position: fixed; top: 14px; right: 14px;
+  background: #1a1a2e; border: 1px solid rgba(255,170,50,0.5);
+  color: #ffaa33; font-family: monospace; font-size: 12px;
+  padding: 8px 14px; border-radius: 6px; cursor: pointer; z-index: 10;
+}
+#copy-sun:hover { background: #252540; }
+#copied-sun {
+  position: fixed; top: 50px; right: 14px;
+  color: #ffaa33; font-family: monospace; font-size: 11px;
+  opacity: 0; transition: opacity 0.3s; z-index: 10;
+}
+#highlight-label {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.75); color: #ffff00;
+  font-size: 16px; font-family: monospace;
+  padding: 8px 16px; border-radius: 6px;
+  border: 1px solid #ffff00;
+  pointer-events: none; z-index: 20;
+  opacity: 0; transition: opacity 0.2s;
+}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  hover: <span id="hover-name">—</span><br>
+  clicked: <span id="click-name">—</span><br>
+  <span class="dim">cam pos: [<span id="px">0</span>, <span id="py">0</span>, <span id="pz">0</span>]</span>
+</div>
+<div id="clicked"></div>
+<div id="highlight-label" id="hl"></div>
+<button id="copy-sun" onclick="copySunPos()">☀️ Copy sun glow position</button>
+<div id="copied-sun">Copied!</div>
+<div id="info">click mesh to identify · drag orange gizmo to place sun glow · copy position when aligned</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a12);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(130, 85, 130);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(-29, 0, 18);
+controls.update();
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+dir.position.set(5, 8, 5); scene.add(dir);
+
+// ─── Sun glow preview sphere ─────────────────────────────────────────────────
+const sunGroup = new THREE.Group();
+sunGroup.position.set(9.7, 24.2, -46.4); // starting guess — drag to adjust
+scene.add(sunGroup);
+
+[
+  { r: 8,  color: 0xfff8e0, opacity: 0.55 },
+  { r: 16, color: 0xffcc44, opacity: 0.28 },
+  { r: 26, color: 0xff8800, opacity: 0.14 },
+].forEach(({ r, color, opacity }) => {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 16, 16),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  sunGroup.add(m);
+});
+
+const transformControls = new THREE.TransformControls(camera, renderer.domElement);
+transformControls.attach(sunGroup);
+transformControls.setMode('translate');
+scene.add(transformControls);
+transformControls.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
+
+function copySunPos() {
+  const p = sunGroup.position;
+  const text = `const SUN_POS: [number, number, number] = [${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}]`;
+  navigator.clipboard.writeText(text);
+  const el = document.getElementById('copied-sun');
+  el.style.opacity = 1;
+  setTimeout(() => el.style.opacity = 0, 1800);
+}
+
+// All meshes collected after load
+const allMeshes = [];
+const originalMaterials = new Map();
+
+const loader = new THREE.GLTFLoader();
+loader.load('./wrath_of_the_dragon.glb', gltf => {
+  scene.add(gltf.scene);
+  gltf.scene.traverse(obj => {
+    if (obj.isMesh) {
+      allMeshes.push(obj);
+      originalMaterials.set(obj, obj.material);
+    }
+  });
+});
+
+// Highlight material
+const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: false, transparent: true, opacity: 0.6 });
+
+let highlightedMesh = null;
+let clickedMesh = null;
+
+function setHighlight(mesh) {
+  // Restore previous hover highlight (but not clicked)
+  if (highlightedMesh && highlightedMesh !== clickedMesh) {
+    highlightedMesh.material = originalMaterials.get(highlightedMesh);
+  }
+  highlightedMesh = mesh;
+  if (mesh && mesh !== clickedMesh) {
+    mesh.material = highlightMat;
+  }
+  document.getElementById('hover-name').textContent = mesh ? mesh.name : '—';
+}
+
+function setClicked(mesh) {
+  // Restore previous clicked mesh
+  if (clickedMesh) {
+    clickedMesh.material = originalMaterials.get(clickedMesh);
+  }
+  clickedMesh = mesh;
+  if (mesh) {
+    mesh.material = new THREE.MeshBasicMaterial({ color: 0xff4400, transparent: true, opacity: 0.75 });
+    document.getElementById('click-name').textContent = mesh.name;
+
+    // Flash banner
+    const el = document.getElementById('clicked');
+    el.textContent = '✓ ' + mesh.name;
+    el.style.opacity = 1;
+    setTimeout(() => el.style.opacity = 0, 2500);
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(mesh.name).catch(() => {});
+  }
+}
+
+// Raycaster
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function getIntersect(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+  mouse.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(allMeshes, false);
+  // Skip __breath_glow__ overlays
+  return hits.find(h => !h.object.name.startsWith('__')) || null;
+}
+
+renderer.domElement.addEventListener('mousemove', e => {
+  if (controls.enabled) {
+    const hit = getIntersect(e);
+    setHighlight(hit ? hit.object : null);
+  }
+});
+
+let mouseDownPos = { x: 0, y: 0 };
+renderer.domElement.addEventListener('mousedown', e => {
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+});
+renderer.domElement.addEventListener('mouseup', e => {
+  const dx = Math.abs(e.clientX - mouseDownPos.x);
+  const dy = Math.abs(e.clientY - mouseDownPos.y);
+  if (dx < 4 && dy < 4) { // it's a click, not a drag
+    const hit = getIntersect(e);
+    if (hit) setClicked(hit.object);
+  }
+});
+
+// HUD
+const pxE = document.getElementById('px'), pyE = document.getElementById('py'), pzE = document.getElementById('pz');
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  const p = camera.position;
+  pxE.textContent = p.x.toFixed(1);
+  pyE.textContent = p.y.toFixed(1);
+  pzE.textContent = p.z.toFixed(1);
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
