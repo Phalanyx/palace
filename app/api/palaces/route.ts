@@ -68,7 +68,7 @@ export async function GET(request: Request) {
           select: { objects: true }
         },
         testSessions: {
-          orderBy: { createdAt: 'desc' } as any,
+          orderBy: { startedAt: 'desc' },
           take: 1
         }
       },

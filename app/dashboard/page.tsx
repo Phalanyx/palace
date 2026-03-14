@@ -12,7 +12,7 @@ export default async function DashboardPage() {
         select: { objects: true }
       },
       testSessions: {
-        orderBy: { createdAt: 'desc' } as any,
+        orderBy: { startedAt: 'desc' },
         take: 1
       }
     },
