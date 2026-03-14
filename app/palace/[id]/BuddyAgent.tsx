@@ -80,7 +80,7 @@ export default function BuddyAgent({
   const [buddyMode, setBuddyMode] = useState<'explore' | 'quiz'>('explore');
   const [connected, setConnected] = useState(false);
   const [micActive, setMicActive] = useState(false);
-  const [isBlinking, setIsBlinking] = useState(true);
+  const [showTooltip, setShowTooltip] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -117,9 +117,9 @@ export default function BuddyAgent({
   const onNavigateRef = useRef(onNavigate);
   onNavigateRef.current = onNavigate;
 
-  // Initialize position after mount
+  // Initialize position: bottom-right corner with padding
   useEffect(() => {
-    setPos({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
+    setPos({ x: window.innerWidth - 24, y: window.innerHeight - 24 });
   }, []);
 
   // Drag handlers — offset is always relative to the orb element (stable 56×56)
@@ -131,7 +131,7 @@ export default function BuddyAgent({
       if (dx > 4 || dy > 4) didDragRef.current = true;
 
       // Clamp so orb stays fully on-screen (pos = bottom-right corner of orb)
-      const orbSize = 56;
+      const orbSize = 64;
       const nx = Math.max(orbSize, Math.min(window.innerWidth, e.clientX - dragOffsetRef.current.x));
       const ny = Math.max(orbSize, Math.min(window.innerHeight, e.clientY - dragOffsetRef.current.y));
       setPos({ x: nx, y: ny });
@@ -155,11 +155,7 @@ export default function BuddyAgent({
     }
   }, []);
 
-  // Stop blinking after 10 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => setIsBlinking(false), 10000);
-    return () => clearTimeout(timer);
-  }, []);
+  // Tooltip stays until user clicks Ada (dismissed in handleFloatClick)
 
   function handlePointerDown(e: React.PointerEvent) {
     isDraggingRef.current = true;
@@ -182,6 +178,7 @@ export default function BuddyAgent({
 
   function handleFloatClick() {
     if (didDragRef.current) return;
+    setShowTooltip(false);
     setIsOpen(o => !o);
   }
 
@@ -725,17 +722,38 @@ export default function BuddyAgent({
         </div>
       )}
 
+      {/* Chat bubble tooltip */}
+      {showTooltip && !isOpen && (
+        <div
+          className="absolute bottom-full right-0 mb-0 cursor-pointer"
+          onClick={() => { setShowTooltip(false); setIsOpen(true); }}
+          style={{ pointerEvents: 'auto' }}
+        >
+          <svg width="240" height="86" viewBox="0 0 240 86" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
+            {/* Bubble body */}
+            <rect x="1" y="1" width="238" height="74" rx="20" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" style={{ backdropFilter: 'blur(24px)' }} />
+            {/* Short tail curving toward bottom-right */}
+            <path d="M200 74 Q203 82 215 85 Q207 80 205 74" fill="rgba(255,255,255,0.15)" />
+            <path d="M200 74 Q203 82 215 85" stroke="rgba(255,255,255,0.2)" strokeWidth="1" fill="none" />
+            <path d="M215 85 Q207 80 205 74" stroke="rgba(255,255,255,0.2)" strokeWidth="1" fill="none" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col justify-center px-5 pb-3 text-white text-xs font-medium" style={{ height: 76 }}>
+            <p>Hi! I&apos;m <strong>Ada</strong>, your study buddy.</p>
+            <p className="text-white/60 mt-0.5">Click me to get help studying!</p>
+          </div>
+        </div>
+      )}
+
       {/* Floating orb */}
       <div
         ref={orbRef}
         onPointerDown={handlePointerDown}
         onClick={handleFloatClick}
-        className={`w-14 h-14 rounded-full cursor-grab active:cursor-grabbing relative touch-none transition-all duration-500 ${
-          isBlinking ? 'ring-2 ring-emerald-400 animate-[pulse_1s_infinite]' : ''
-        }`}
+        className="w-16 h-16 rounded-full cursor-grab active:cursor-grabbing relative touch-none transition-all duration-500 shadow-lg shadow-black/30"
         style={{ overflow: 'hidden' }}
       >
-        <VoiceOrb state={orbState} inputLevel={inputLevel} outputLevel={outputLevel} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/avatar.png" alt="Study buddy" className="w-full h-full object-cover rounded-full pointer-events-none select-none" draggable={false} />
       </div>
     </div>
   );
