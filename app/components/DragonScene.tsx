@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import { Suspense, useRef, useMemo, useEffect } from 'react'
+import { Suspense, useRef, useEffect } from 'react'
 import * as THREE from 'three'
 
 // ─── Coordinate note ────────────────────────────────────────────────────────
@@ -105,158 +105,6 @@ function Dragon() {
   return <primitive object={scene} />
 }
 
-// Dragon breath: green dragon mouth ~ (-25, 10, 20), beam aimed at blast sphere ~ (-23, 28, 28)
-function DragonBreathEffect() {
-  const coreRef    = useRef<THREE.Mesh>(null)
-  const midRef     = useRef<THREE.Mesh>(null)
-  const outerRef   = useRef<THREE.Mesh>(null)
-  const glowRef    = useRef<THREE.Mesh>(null)
-  const light1Ref  = useRef<THREE.PointLight>(null)
-  const light2Ref  = useRef<THREE.PointLight>(null)
-  const light3Ref  = useRef<THREE.PointLight>(null)
-
-  // Quaternion to rotate cone (default up-axis +Y) to face from mouth toward blast sphere
-  const quaternion = useMemo(() => {
-    const from  = new THREE.Vector3(-25, 10, 20)
-    const to    = new THREE.Vector3(-23, 28, 28)
-    const dir   = to.clone().sub(from).normalize()
-    const up    = new THREE.Vector3(0, 1, 0)
-    const q     = new THREE.Quaternion().setFromUnitVectors(up, dir)
-    return q
-  }, [])
-
-  // Midpoint along the beam — where lights and cones are anchored
-  const beamMid   = new THREE.Vector3(-24, 19, 24)
-  const mouthPos  = new THREE.Vector3(-25, 10, 20)
-  const impactPos = new THREE.Vector3(-23, 28, 28)
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime()
-    // fast flicker for the inner core
-    const flicker = 1 + Math.sin(t * 14) * 0.08 + Math.sin(t * 7.3) * 0.06
-    // slow breathe for outer glow
-    const breathe = 1 + Math.sin(t * 2.1) * 0.15
-
-    if (coreRef.current)  coreRef.current.scale.setScalar(flicker)
-    if (midRef.current)   midRef.current.scale.setScalar(flicker * 1.02)
-    if (outerRef.current) outerRef.current.scale.setScalar(breathe)
-    if (glowRef.current)  glowRef.current.scale.setScalar(breathe * 1.1)
-
-    // Modulate the main fill light intensity
-    if (light1Ref.current) light1Ref.current.intensity = 80 + Math.sin(t * 11) * 20
-    if (light2Ref.current) light2Ref.current.intensity = 40 + Math.sin(t * 7 + 1) * 12
-    if (light3Ref.current) light3Ref.current.intensity = 25 + Math.sin(t * 3.5 + 2) * 8
-  })
-
-  return (
-    <group>
-      {/* ── Lights ── */}
-      {/* Scorching white-cyan at mouth */}
-      <pointLight
-        ref={light1Ref}
-        position={mouthPos.toArray()}
-        color="#aaffff"
-        intensity={80}
-        distance={60}
-        decay={1.8}
-      />
-      {/* Main cyan fill along beam */}
-      <pointLight
-        ref={light2Ref}
-        position={beamMid.toArray()}
-        color="#00ddff"
-        intensity={40}
-        distance={50}
-        decay={1.6}
-      />
-      {/* Soft teal glow at blast impact */}
-      <pointLight
-        ref={light3Ref}
-        position={impactPos.toArray()}
-        color="#33eeff"
-        intensity={25}
-        distance={45}
-        decay={1.5}
-      />
-
-      {/* ── Beam cones ── all anchored at beam midpoint, oriented along beam axis ── */}
-
-      {/* Inner core — near-white, very bright */}
-      <mesh ref={coreRef} position={beamMid.toArray()} quaternion={quaternion}>
-        <coneGeometry args={[1.2, 22, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.92}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Mid layer — bright cyan */}
-      <mesh ref={midRef} position={beamMid.toArray()} quaternion={quaternion}>
-        <coneGeometry args={[2.4, 22, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#66ffff"
-          transparent
-          opacity={0.65}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Outer haze — wide soft cyan */}
-      <mesh ref={outerRef} position={beamMid.toArray()} quaternion={quaternion}>
-        <coneGeometry args={[4.5, 24, 16, 1, true]} />
-        <meshBasicMaterial
-          color="#00ccff"
-          transparent
-          opacity={0.30}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Volumetric scatter glow sphere at mouth origin */}
-      <mesh position={mouthPos.toArray()}>
-        <sphereGeometry args={[3.5, 16, 16]} />
-        <meshBasicMaterial
-          color="#aaffff"
-          transparent
-          opacity={0.55}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Large diffuse corona at impact */}
-      <mesh ref={glowRef} position={impactPos.toArray()}>
-        <sphereGeometry args={[5.5, 16, 16]} />
-        <meshBasicMaterial
-          color="#33ddff"
-          transparent
-          opacity={0.35}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Tiny bright spark at mouth center */}
-      <mesh position={mouthPos.toArray()}>
-        <sphereGeometry args={[1.0, 12, 12]} />
-        <meshBasicMaterial
-          color="#ffffff"
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-    </group>
-  )
-}
-
 // Wizard is at approximately (0, -1, 0) in Three.js world space
 // Lights match the reference: green rune-floor glow + body fill + white shaft-light from above
 function WizardLights() {
@@ -319,7 +167,6 @@ export default function DragonScene() {
         <directionalLight position={[-5, 2, -5]} intensity={0.4} color="#8844ff" />
         <Dragon />
         <WizardLights />
-        <DragonBreathEffect />
         <CameraRig />
       </Suspense>
     </Canvas>
