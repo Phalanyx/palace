@@ -48,52 +48,23 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
   useEffect(() => {
     // Prefer the proper Mesh DB relation, fall back to legacy metadata
     let meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
-    
-    // Support transition: check if URL refers to an .html blueprint
-    const isHtmlBlueprint = meshUrl?.endsWith('.html');
 
-    const buildMeshFromCode = (codeOrHtml: string) => {
+    const buildMeshFromCode = (code: string) => {
       try {
-        let obj: THREE.Object3D | null = null;
-        
-        if (isHtmlBlueprint || codeOrHtml.includes('createMnemonicModel')) {
-          // Extract script content from HTML
-          let scriptContent = codeOrHtml;
-          if (codeOrHtml.includes('<script>')) {
-            scriptContent = codeOrHtml.split('<script>')[1].split('</script>')[0];
-          }
-          
-          // Execute script in a sandbox to define the function
-          const sandbox: any = { createMnemonicModel: null };
-          const setupFn = new Function('THREE', 'window', scriptContent);
-          setupFn(THREE, sandbox);
-          
-          if (typeof sandbox.createMnemonicModel === 'function') {
-            obj = sandbox.createMnemonicModel(THREE);
-          } else if (typeof (window as any).createMnemonicModel === 'function') {
-            obj = (window as any).createMnemonicModel(THREE);
-          }
-        }
+        const createMeshFn = new Function('THREE', code);
+        const obj = createMeshFn(THREE);
+        if (!obj) throw new Error("No object returned.");
 
-        // Final fallback to raw eval if object wasn't built yet
-        if (!obj) {
-          const createMeshFn = new Function('THREE', codeOrHtml);
-          obj = createMeshFn(THREE);
-        }
-        
-        if (!obj) throw new Error("Could not instantiate object from blueprint.");
-
-        // Attempt to extract an expressive color
-        let foundColor = '#ff00ff'; // default neon
+        let foundColor = '#ff00ff';
         obj.traverse((child: any) => {
-          if (child.isMesh && child.material && child.material.color) {
+          if (child.isMesh && child.material?.color) {
             foundColor = '#' + child.material.color.getHexString();
           }
         });
         setAccentColor(foundColor);
         setGeneratedObject(obj);
       } catch (e) {
-        console.error("Failed to build mesh from code:", e);
+        console.error("Failed to build mesh:", e);
         const fallbackFn = new Function('THREE', FALLBACK_CODE);
         setGeneratedObject(fallbackFn(THREE));
       }
@@ -106,15 +77,13 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
 
     fetch(meshUrl)
       .then(r => {
-          if (!r.ok) throw new Error("Could not fetch mesh asset");
-          return r.text();
+        if (!r.ok) throw new Error("Could not fetch mesh");
+        return r.text();
       })
-      .then(text => {
-          buildMeshFromCode(text);
-      })
-      .catch((e) => {
-          console.error(e);
-          buildMeshFromCode(FALLBACK_CODE);
+      .then(text => buildMeshFromCode(text))
+      .catch(e => {
+        console.error(e);
+        buildMeshFromCode(FALLBACK_CODE);
       });
   }, [objectData.mesh?.storageUrl, objectData.metadata?.meshUrl]);
 

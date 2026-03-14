@@ -285,11 +285,11 @@ export async function processDocuments(palaceId: string) {
           const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff });
           return new THREE.Mesh(geometry, material);
         `;
-        const meshPath = `meshes/${palace.id}/${saved.dbId}.html`;
+        const meshPath = `meshes/${palace.id}/${saved.dbId}.js`;
 
         const { error: meshErr } = await supabase.storage
           .from('palace-models')
-          .upload(meshPath, scriptContent, { contentType: 'text/html', upsert: true })
+          .upload(meshPath, scriptContent, { contentType: 'application/javascript', upsert: true })
 
         if (meshErr) {
           console.error(`  Mesh upload failed for "${saved.label}": ${meshErr.message}`)
