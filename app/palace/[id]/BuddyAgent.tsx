@@ -454,34 +454,37 @@ export default function BuddyAgent({
           style={{
             width: 340,
             maxHeight: 520,
-            background: 'rgba(15, 15, 25, 0.96)',
-            backdropFilter: 'blur(20px)',
+            background: 'rgba(255, 255, 255, 0.12)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
             borderRadius: 20,
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.2)',
+            fontFamily: 'var(--font-baloo), "Baloo 2", sans-serif',
+            fontWeight: 500,
           }}
         >
           {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-3 cursor-grab active:cursor-grabbing select-none"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.15)' }}
             onPointerDown={handlePointerDown}
           >
             <div className="flex items-center gap-2.5">
               <div className="relative">
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+                  style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)' }}
                 >
                   <Bot className="w-4 h-4 text-white" />
                 </div>
                 {connected && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#0f0f19]" />
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-white/20" />
                 )}
               </div>
               <div>
                 <p className="text-white font-semibold text-sm leading-none">Study Buddy</p>
-                <p className="text-indigo-400 text-xs mt-0.5">{statusText}</p>
+                <p className="text-white/60 text-xs mt-0.5">{statusText}</p>
               </div>
             </div>
             <button
@@ -493,14 +496,14 @@ export default function BuddyAgent({
           </div>
 
           {/* Context bar */}
-          <div className="px-3 py-2 flex gap-1.5 flex-wrap items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="px-3 py-2 flex gap-1.5 flex-wrap items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
             <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
+              style={{ background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
               {contextLevel}
             </span>
             {isTestMode ? (
               <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: 'rgba(245,158,11,0.12)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)' }}>
+                style={{ background: 'rgba(255,255,255,0.12)', color: '#fcd34d', border: '1px solid rgba(255,255,255,0.2)' }}>
                 Test mode
               </span>
             ) : (
@@ -509,8 +512,8 @@ export default function BuddyAgent({
                   onClick={() => setBuddyMode('explore')}
                   className="text-xs px-2 py-0.5 rounded-full font-medium transition-all"
                   style={buddyMode === 'explore'
-                    ? { background: 'rgba(16,185,129,0.25)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.4)' }
-                    : { background: 'rgba(16,185,129,0.06)', color: 'rgba(110,231,183,0.4)', border: '1px solid rgba(16,185,129,0.12)' }
+                    ? { background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }
+                    : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)' }
                   }
                 >
                   Explore
@@ -519,8 +522,8 @@ export default function BuddyAgent({
                   onClick={() => setBuddyMode('quiz')}
                   className="text-xs px-2 py-0.5 rounded-full font-medium transition-all"
                   style={buddyMode === 'quiz'
-                    ? { background: 'rgba(168,85,247,0.25)', color: '#d8b4fe', border: '1px solid rgba(168,85,247,0.4)' }
-                    : { background: 'rgba(168,85,247,0.06)', color: 'rgba(216,180,254,0.4)', border: '1px solid rgba(168,85,247,0.12)' }
+                    ? { background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }
+                    : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)' }
                   }
                 >
                   Quiz
@@ -532,7 +535,7 @@ export default function BuddyAgent({
           {/* Error */}
           {error && (
             <div className="mx-3 mt-2 px-3 py-2 rounded-xl text-xs"
-              style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)' }}>
+              style={{ background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(255,255,255,0.15)' }}>
               {error}
             </div>
           )}
@@ -565,21 +568,21 @@ export default function BuddyAgent({
                     <div
                       className="max-w-[90%] rounded-2xl overflow-hidden text-xs"
                       style={{
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(99,102,241,0.25)',
+                        background: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.2)',
                       }}
                     >
                       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
                         <div
                           className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.3), rgba(99,102,241,0.3))' }}
+                          style={{ background: 'rgba(255,255,255,0.15)' }}
                         >
-                          <MapPin className="w-4 h-4 text-emerald-300" />
+                          <MapPin className="w-4 h-4 text-white/80" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-white/90 font-semibold leading-tight capitalize">{roomLabel}</p>
+                          <p className="text-white font-semibold leading-tight capitalize">{roomLabel}</p>
                           {targetObj && (
-                            <p className="text-indigo-300/70 leading-tight mt-0.5 truncate">{targetObj.label}</p>
+                            <p className="text-white/60 leading-tight mt-0.5 truncate">{targetObj.label}</p>
                           )}
                         </div>
                       </div>
@@ -611,7 +614,7 @@ export default function BuddyAgent({
                             ));
                           }}
                           className="flex-1 py-2 font-semibold transition-colors hover:brightness-110"
-                          style={{ color: '#6ee7b7', background: 'rgba(16,185,129,0.08)' }}
+                          style={{ color: '#fff', background: 'rgba(255,255,255,0.1)' }}
                         >
                           Move here
                         </button>
@@ -628,16 +631,17 @@ export default function BuddyAgent({
                     className="max-w-[85%] px-3 py-2 rounded-2xl text-xs leading-relaxed"
                     style={isUser
                       ? {
-                          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                          background: 'rgba(255,255,255,0.2)',
                           color: '#fff',
                           borderBottomRightRadius: 4,
+                          border: '1px solid rgba(255,255,255,0.25)',
                           opacity: msg.isFinished ? 1 : 0.7,
                         }
                       : {
-                          background: 'rgba(255,255,255,0.07)',
+                          background: 'rgba(255,255,255,0.08)',
                           color: 'rgba(255,255,255,0.85)',
                           borderBottomLeftRadius: 4,
-                          border: '1px solid rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.12)',
                           opacity: msg.isFinished ? 1 : 0.7,
                         }
                     }
@@ -645,7 +649,7 @@ export default function BuddyAgent({
                     {msg.text}
                     {!msg.isFinished && (
                       <span className="inline-block w-1.5 h-3 ml-1 rounded-sm animate-pulse"
-                        style={{ background: isUser ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.8)', verticalAlign: 'middle' }} />
+                        style={{ background: 'rgba(255,255,255,0.5)', verticalAlign: 'middle' }} />
                     )}
                   </div>
                 </div>
@@ -655,12 +659,12 @@ export default function BuddyAgent({
           </div>
 
           {/* Controls */}
-          <div className="px-3 pb-3 pt-2 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-3 pb-3 pt-2 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
             {!connected ? (
               <button
                 onClick={handleConnect}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff' }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-white/25"
+                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
               >
                 <Phone className="w-4 h-4" /> Connect
               </button>
@@ -677,9 +681,9 @@ export default function BuddyAgent({
                     placeholder="Type a message..."
                     className="flex-1 text-xs px-3 py-2 rounded-xl outline-none"
                     style={{
-                      background: 'rgba(255,255,255,0.06)',
+                      background: 'rgba(255,255,255,0.08)',
                       color: 'rgba(255,255,255,0.85)',
-                      border: '1px solid rgba(255,255,255,0.1)',
+                      border: '1px solid rgba(255,255,255,0.15)',
                     }}
                   />
                   <button
@@ -687,9 +691,9 @@ export default function BuddyAgent({
                     disabled={!textInput.trim()}
                     className="px-3 py-2 rounded-xl transition-all"
                     style={{
-                      background: textInput.trim() ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)',
-                      color: textInput.trim() ? '#a5b4fc' : 'rgba(255,255,255,0.2)',
-                      border: '1px solid rgba(99,102,241,0.2)',
+                      background: textInput.trim() ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)',
+                      color: textInput.trim() ? '#fff' : 'rgba(255,255,255,0.2)',
+                      border: '1px solid rgba(255,255,255,0.2)',
                     }}
                   >
                     <Send className="w-3.5 h-3.5" />
@@ -702,8 +706,8 @@ export default function BuddyAgent({
                     onClick={handleMicToggle}
                     className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-all"
                     style={micActive
-                      ? { background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)' }
-                      : { background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.2)' }
+                      ? { background: 'rgba(239,68,68,0.2)', color: '#fca5a5', border: '1px solid rgba(255,255,255,0.2)' }
+                      : { background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }
                     }
                   >
                     {micActive ? <><MicOff className="w-3.5 h-3.5" /> Mute</> : <><Mic className="w-3.5 h-3.5" /> Talk</>}
@@ -711,7 +715,7 @@ export default function BuddyAgent({
                   <button
                     onClick={handleDisconnect}
                     className="px-3 py-2 rounded-xl transition-all"
-                    style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.15)' }}
                   >
                     <PhoneOff className="w-3.5 h-3.5" />
                   </button>
