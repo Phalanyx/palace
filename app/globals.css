@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Kingjola';
+  src: url('/fonts/kingjola.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @theme {
   --font-baloo: "Baloo 2", sans-serif;
   --font-comic: "Comic Neue", cursive;
