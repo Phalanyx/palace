@@ -454,9 +454,9 @@ export default function BuddyAgent({
           style={{
             width: 340,
             maxHeight: 520,
-            background: 'rgba(255, 255, 255, 0.12)',
-            backdropFilter: 'blur(24px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+            background: 'rgba(30, 30, 40, 0.65)',
+            backdropFilter: 'blur(40px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
             borderRadius: 20,
             border: '1px solid rgba(255, 255, 255, 0.2)',
             boxShadow: '0 25px 50px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.2)',
