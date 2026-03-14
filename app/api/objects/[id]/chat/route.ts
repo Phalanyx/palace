@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server'
+import { requireApiUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { askMoorcheh } from '@/lib/moorcheh'
 
-export async function POST(request: Request, context: any) {
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
-    const { params } = context
+    const auth = await requireApiUser()
+    if (!auth.user) {
+      return auth.response
+    }
+
+    const params = await context.params
     const objectId = params.id
     const { message } = await request.json()
 
@@ -15,10 +24,10 @@ export async function POST(request: Request, context: any) {
     // Find the object to get its label and palaceId (via room)
     const targetObject = await prisma.object.findUnique({
       where: { id: objectId },
-      include: { room: true }
+      include: { room: { include: { palace: true } } }
     })
 
-    if (!targetObject) {
+    if (!targetObject || targetObject.room.palace.userId !== auth.user.id) {
       return NextResponse.json({ error: 'Object not found' }, { status: 404 })
     }
 
@@ -31,8 +40,9 @@ export async function POST(request: Request, context: any) {
     return NextResponse.json({
       answer: moorchehResponse.answer || "I couldn't find an answer to that."
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in POST /api/objects/:id/chat:', error)
-    return NextResponse.json({ error: error.message || 'Failed to get answer' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to get answer'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

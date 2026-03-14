@@ -1,31 +1,53 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
+import { requirePalaceAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(request: Request, context: any) {
+type PalaceTestQuestion = {
+  objectId: string
+  questionText: string
+  correctAnswer: string
+  userAnswer: null
+  score: null
+  aiFeedback: null
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
   try {
     const params = await context.params
     const palaceId = params.id
     const body = await request.json().catch(() => ({}))
     const gradingInstructions: string = body.gradingInstructions || 'Grade based on conceptual understanding and accuracy.'
 
-    const palace = await prisma.palace.findUnique({
-      where: { id: palaceId },
+    const auth = await requirePalaceAccess(palaceId)
+    if (!auth.palace) {
+      return auth.response
+    }
+
+    const palace = await prisma.palace.findFirst({
+      where: {
+        id: palaceId,
+        userId: auth.user.id,
+      },
       include: { rooms: { include: { objects: true } } }
     })
 
-    const allObjects = palace?.rooms.flatMap((r: any) => r.objects) || []
+    const allObjects = palace?.rooms.flatMap((room) => room.objects) || []
 
     if (!palace || allObjects.length === 0) {
       return NextResponse.json({ error: 'Palace not found or has no objects' }, { status: 404 })
     }
 
     // Use the pre-generated sampleQuestion from each Object
-    const questions = allObjects
-      .filter((obj: any) => obj.sampleQuestion)
-      .map((obj: any) => ({
-        objectId: obj.id,
-        questionText: obj.sampleQuestion,
-        correctAnswer: obj.description, // used as reference for grading
+    const questions: PalaceTestQuestion[] = allObjects
+      .filter((object) => object.sampleQuestion)
+      .map((object) => ({
+        objectId: object.id,
+        questionText: object.sampleQuestion!,
+        correctAnswer: object.description,
         userAnswer: null,
         score: null,
         aiFeedback: null,
@@ -39,13 +61,14 @@ export async function POST(request: Request, context: any) {
       data: {
         palaceId: palace.id,
         totalQuestions: questions.length,
-        questions: { gradingInstructions, items: questions } as any,
+        questions: { gradingInstructions, items: questions } as Prisma.InputJsonValue,
       }
     })
 
     return NextResponse.json({ sessionId: session.id, questions, gradingInstructions })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating test session:', error)
-    return NextResponse.json({ error: error.message || 'Failed to create test session' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to create test session'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
