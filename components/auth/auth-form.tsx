@@ -72,7 +72,17 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
   const [isGooglePending, setIsGooglePending] = useState(false)
   const [isGoogleScriptLoaded, setIsGoogleScriptLoaded] = useState(false)
   const [googleButtonWidth, setGoogleButtonWidth] = useState(0)
+  const [canRenderNativeGoogleButton, setCanRenderNativeGoogleButton] = useState(false)
+  const [hasRenderedNativeGoogleButton, setHasRenderedNativeGoogleButton] = useState(false)
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  const googleGisAllowedOrigins = useMemo(
+    () =>
+      (process.env.NEXT_PUBLIC_GOOGLE_GIS_ALLOWED_ORIGINS ?? "http://127.0.0.1:3000")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    []
+  )
 
   const isSignup = mode === "signup"
   const title = isSignup ? "Create your palace" : "Welcome back"
@@ -127,6 +137,37 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
       setError(messageText)
     } finally {
       setIsPending(false)
+    }
+  }
+
+  async function handleGoogleRedirectSignIn() {
+    setError(null)
+    setMessage(null)
+    setIsGooglePending(true)
+
+    try {
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        },
+      })
+
+      if (oauthError) {
+        throw oauthError
+      }
+
+      if (data.url) {
+        window.location.assign(data.url)
+        return
+      }
+
+      throw new Error("Google sign-in could not start.")
+    } catch (oauthFailure) {
+      const messageText =
+        oauthFailure instanceof Error ? oauthFailure.message : "Google sign-in failed."
+      setError(messageText)
+      setIsGooglePending(false)
     }
   }
 
@@ -192,7 +233,17 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
   }, [])
 
   useEffect(() => {
+    setCanRenderNativeGoogleButton(googleGisAllowedOrigins.includes(window.location.origin))
+  }, [googleGisAllowedOrigins])
+
+  useEffect(() => {
+    if (!canRenderNativeGoogleButton) {
+      setHasRenderedNativeGoogleButton(false)
+      return
+    }
+
     if (
+      !canRenderNativeGoogleButton ||
       !isGoogleScriptLoaded ||
       !googleClientId ||
       !googleButtonRef.current ||
@@ -203,6 +254,7 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
     }
 
     googleButtonRef.current.innerHTML = ""
+    setHasRenderedNativeGoogleButton(false)
 
     window.google.accounts.id.initialize({
       client_id: googleClientId,
@@ -220,20 +272,27 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
       width: googleButtonWidth,
       logo_alignment: "left",
     })
-  }, [googleButtonWidth, googleClientId, isGoogleScriptLoaded, isSignup])
+
+    const hasButtonContent = googleButtonRef.current.childElementCount > 0
+    if (hasButtonContent) {
+      setHasRenderedNativeGoogleButton(true)
+    }
+  }, [canRenderNativeGoogleButton, googleButtonWidth, googleClientId, isGoogleScriptLoaded, isSignup])
 
   return (
     <Card className="border-border/70 bg-card/95 shadow-2xl backdrop-blur">
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="afterInteractive"
-        onLoad={() => {
-          setIsGoogleScriptLoaded(true)
-        }}
-        onReady={() => {
-          setIsGoogleScriptLoaded(true)
-        }}
-      />
+      {canRenderNativeGoogleButton ? (
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="afterInteractive"
+          onLoad={() => {
+            setIsGoogleScriptLoaded(true)
+          }}
+          onReady={() => {
+            setIsGoogleScriptLoaded(true)
+          }}
+        />
+      ) : null}
 
       <CardHeader className="gap-3">
         <CardTitle className="font-[family-name:var(--font-baloo)] text-3xl">
@@ -262,10 +321,39 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
           ) : null}
 
           <div className="w-full space-y-2">
-            <div
-              ref={googleButtonRef}
-              className="w-full min-h-11 rounded-2xl [&>div]:!w-full [&_iframe]:!w-full"
-            />
+            {canRenderNativeGoogleButton && googleClientId ? (
+              <div className="relative w-full min-h-11">
+                <div
+                  ref={googleButtonRef}
+                  className={hasRenderedNativeGoogleButton
+                    ? "w-full min-h-11 rounded-2xl [&>div]:!w-full [&_iframe]:!w-full"
+                    : "absolute inset-0 opacity-0 pointer-events-none w-full min-h-11 rounded-2xl [&>div]:!w-full [&_iframe]:!w-full"}
+                />
+                {!hasRenderedNativeGoogleButton ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-11 w-full rounded-2xl"
+                    onClick={handleGoogleRedirectSignIn}
+                    disabled={isPending || isGooglePending}
+                  >
+                    {isGooglePending ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-11 w-full rounded-2xl"
+                onClick={handleGoogleRedirectSignIn}
+                disabled={isPending || isGooglePending}
+              >
+                {isGooglePending ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}
+              </Button>
+            )}
             {isGooglePending ? (
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircleIcon className="animate-spin" />

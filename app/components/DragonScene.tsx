@@ -293,6 +293,26 @@ function WizardLights() {
 }
 
 export default function DragonScene() {
+  useEffect(() => {
+    const originalWarn = console.warn
+
+    console.warn = (...args) => {
+      const [firstArg] = args
+      if (
+        typeof firstArg === 'string' &&
+        firstArg.includes('THREE.THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.')
+      ) {
+        return
+      }
+
+      originalWarn(...args)
+    }
+
+    return () => {
+      console.warn = originalWarn
+    }
+  }, [])
+
   return (
     <Canvas
       camera={{ position: KEYFRAMES[0].pos, fov: 50 }}
