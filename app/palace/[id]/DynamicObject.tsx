@@ -20,6 +20,7 @@ interface DynamicObjectProps {
     orderIndex: number;
     sampleQuestion?: string | null;
     metadata?: { meshUrl?: string; [key: string]: any } | null;
+    mesh?: { storageUrl: string } | null;
   };
   position: [number, number, number];
 }
@@ -68,7 +69,8 @@ export function DynamicObject({ objectData, position }: DynamicObjectProps) {
 
   // Fetch mesh definition from Supabase at mount time
   useEffect(() => {
-    const meshUrl = objectData.metadata?.meshUrl;
+    // Prefer the proper Mesh DB relation, fall back to legacy metadata
+    const meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
     if (!meshUrl) {
       setParts(FALLBACK_PARTS);
       return;
@@ -83,7 +85,7 @@ export function DynamicObject({ objectData, position }: DynamicObjectProps) {
         }
       })
       .catch(() => setParts(FALLBACK_PARTS));
-  }, [objectData.metadata?.meshUrl]);
+  }, [objectData.mesh?.storageUrl, objectData.metadata?.meshUrl]);
 
   // Floating bob + slow rotation
   useFrame(({ clock }) => {

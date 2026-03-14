@@ -35,14 +35,14 @@ const palaceSchema = {
             sample_question: { type: Type.STRING, description: "A test question evaluating the student's semantic understanding of this object's concept." },
             mesh_parts: {
               type: Type.ARRAY,
-              description: "Compound 3D mesh definition: an array of primitive parts that compose this object. Each part has its own shape, color, position, and scale. Use NEON/bright colors like #ff00ff, #00ffff, #ffff00.",
+              description: "Compound 3D mesh definition: 1-3 primitives composing this object. MUST reflect the ROOM CONTEXT first (e.g., kitchen → food/pots, bedroom → candles/crowns, library → books/scrolls, great_hall → swords/shields). Color must be shocking neon (#ff00ff, #00ffff, #ccff00, #ff6600) to stand out in a dark scene.",
               items: {
                 type: Type.OBJECT,
                 properties: {
                   primitive: { type: Type.STRING, enum: ["box", "sphere", "cylinder", "cone", "torus", "icosahedron", "octahedron"] },
-                  color: { type: Type.STRING, description: "Hex color, e.g. '#ff00ff'. Must be a shocking neon color." },
+                  color: { type: Type.STRING, description: "Hex color — MUST be a shocking neon like #ff00ff, #00ffff, #ccff00, #ff6600, #ff0066" },
                   position: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] local offset from group center" },
-                  scale: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] scale, e.g. [1, 1, 1]" }
+                  scale: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] scale. Keep reasonable: e.g. [0.5, 0.8, 0.5]" }
                 },
                 required: ["primitive", "color", "position", "scale"]
               }
@@ -153,12 +153,21 @@ export async function processDocuments(palaceId: string) {
       Each room MUST contain between 2 and 5 objects. NEVER EXCEED 5 OBJECTS PER ROOM.
       Group related concepts into the same room. Order objects within each room logically.
       
-      For each object, you must define 'mesh_parts': an array of 1-3 primitive shapes that compose
-      the object. Be creative: a book = flat box; a key = thin cylinder + tiny sphere at top;
-      a flask = cylinder + smaller sphere; a torch = thin cylinder + cone on top.
-      Use SHOCKING NEON COLORS like #ff00ff, #00ffff, #ccff00, #ff6600 so the user can immediately
-      spot them against the dark medieval background. Position parts relative to group center.
-      Each part: { primitive, color, position: [x,y,z], scale: [x,y,z] }
+      For each object, create 'mesh_parts': 1-3 primitives that form a recognizable thematic object.
+      
+      THE ROOM CONTEXT IS THE TOP PRIORITY for mesh shape:
+      - bedroom: pillow (flat box), crown (torus + cylinder), candle (thin cylinder + sphere top),
+                  ring (torus), goblet (cylinder + sphere base)
+      - great_hall: sword (tall thin cylinder + flat box hilt), shield (flat box), chalice (cylinder
+                    + inverted cone base), banner (flat box), axe (box + diamond icosahedron)
+      - kitchen: pot (cylinder + torus rim), bread loaf (sphere, squashed), apple (sphere + tiny
+                 cone stem), ladle (cylinder + sphere bowl), fish (icosahedron)
+      - library: open book (two thin boxes angled), scroll (cylinder), quill (cone + cylinder),
+                 lantern (cylinder + cone top), hourglass (two cones touching points)
+      
+      Use SHOCKING NEON COLORS: #ff00ff, #00ffff, #ccff00, #ff6600, #ff0088, #00ff88
+      so the user can immediately spot them against the dark medieval background.
+      Position parts relative to group center (object sits at y=0 by default).
       
       User's learning goal: "${palace.prompt}"
     `
@@ -197,37 +206,54 @@ export async function processDocuments(palaceId: string) {
         for (let oi = 0; oi < roomData.objects.length; oi++) {
           const obj = roomData.objects[oi]
 
-          // Upload mesh_parts definition to Supabase Storage
+          // Upload mesh_parts to Supabase Storage
           let meshUrl: string | null = null
           if (obj.mesh_parts && obj.mesh_parts.length > 0) {
+            console.log(`  Uploading mesh for "${obj.label}" (${obj.mesh_parts.length} parts, room: ${roomData.room_key})`)
             const meshJson = JSON.stringify({ parts: obj.mesh_parts })
             const meshPath = `meshes/${palace.id}/${room.id}-${oi}.json`
             const { error: meshErr } = await supabase.storage
               .from('palace-models')
               .upload(meshPath, meshJson, { contentType: 'application/json', upsert: true })
             if (meshErr) {
-              console.error(`Non-fatal: failed to upload mesh for object ${oi}:`, meshErr)
+              console.error(`  ❌ Mesh upload failed for "${obj.label}": ${meshErr.message}`)
             } else {
               const { data: urlData } = supabase.storage
                 .from('palace-models')
                 .getPublicUrl(meshPath)
               meshUrl = urlData.publicUrl
+              console.log(`  ✅ Mesh uploaded: ${meshUrl}`)
             }
+          } else {
+            console.warn(`  ⚠️ No mesh_parts for "${obj.label}" — falling back to default mesh`)
           }
 
+          // Create Object record
           const createdObj = await prisma.object.create({
             data: {
               roomId: room.id,
               documentId: palace.documents[0]?.id || "dummy",
               label: obj.label,
               description: obj.description,
-              modelKey: obj.model_key,
+              modelKey: obj.model_key || 'custom',
               colorHint: obj.color_hint,
               orderIndex: obj.order_index,
               sampleQuestion: obj.sample_question,
-              metadata: { ...obj.metadata, meshUrl },
+              metadata: obj.metadata ?? {},
             }
           })
+
+          // Create Mesh record in DB (if we have a storage URL)
+          if (meshUrl) {
+            await prisma.mesh.create({
+              data: {
+                objectId: createdObj.id,
+                storageUrl: meshUrl,
+                roomKey: roomData.room_key,
+              }
+            })
+          }
+
           allLabels.push(createdObj.label)
         }
       }

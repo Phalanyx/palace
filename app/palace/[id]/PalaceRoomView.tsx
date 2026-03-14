@@ -20,6 +20,8 @@ interface RoomObject {
   colorHint: string | null;
   orderIndex: number;
   sampleQuestion: string | null;
+  metadata?: Record<string, any> | null;
+  mesh?: { storageUrl: string } | null;
 }
 
 interface Room {

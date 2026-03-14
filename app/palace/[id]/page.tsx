@@ -17,7 +17,8 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
         orderBy: { orderIndex: 'asc' },
         include: {
           objects: {
-            orderBy: { orderIndex: 'asc' }
+            orderBy: { orderIndex: 'asc' },
+            include: { mesh: true }
           }
         }
       },
@@ -48,6 +49,8 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
       colorHint: obj.colorHint,
       orderIndex: obj.orderIndex,
       sampleQuestion: obj.sampleQuestion,
+      metadata: obj.metadata,
+      mesh: obj.mesh ? { storageUrl: obj.mesh.storageUrl } : null,
     }))
   }));
 

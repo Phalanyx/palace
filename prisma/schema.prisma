@@ -56,14 +56,26 @@ model Object {
   document       Document @relation(fields: [documentId], references: [id])
   label          String
   description    String   @db.Text
-  modelKey       String   @map("model_key")  // book | scroll | crystal | orb | flask | key | coin | torch
+  modelKey       String   @map("model_key")
   colorHint      String?  @map("color_hint")
   orderIndex     Int      @map("order_index")
   sampleQuestion String?  @map("sample_question")
   metadata       Json?
+  mesh           Mesh?
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("objects")
+}
+
+model Mesh {
+  id         String   @id @default(uuid())
+  objectId   String   @unique @map("object_id")
+  object     Object   @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  storageUrl String   @map("storage_url")
+  roomKey    String   @map("room_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("meshes")
 }
 
 model TestSession {

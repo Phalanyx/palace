@@ -14,7 +14,8 @@ export async function GET(request: Request, context: any) {
           orderBy: { orderIndex: 'asc' as const },
           include: {
             objects: {
-              orderBy: { orderIndex: 'asc' as const }
+              orderBy: { orderIndex: 'asc' as const },
+              include: { mesh: true }
             }
           }
         }
