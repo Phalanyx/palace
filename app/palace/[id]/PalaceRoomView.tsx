@@ -529,7 +529,7 @@ export default function PalaceRoomView({
 
       {/* BuddyAgent — always mounted to keep WS connection alive across phases */}
       <BuddyAgent
-        palace={{ title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
+        palace={{ id: palaceId, title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
         currentRoom={activeRoom ?? null}
         selectedObject={currentObj ?? null}
         openObjects={openObjects}

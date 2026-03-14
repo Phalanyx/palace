@@ -24,6 +24,7 @@ interface Document {
 }
 
 interface Palace {
+  id: string;
   title: string;
   prompt: string;
   documents: Document[];
@@ -154,6 +155,7 @@ export default function BuddyAgent({
 
   // Build context
   const buildContext = useCallback((): BuddyContextInput => ({
+    palaceId: palace.id,
     palaceTitle: palace.title,
     palacePrompt: palace.prompt,
     documentSummaries: palace.documents
