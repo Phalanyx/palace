@@ -16,17 +16,17 @@ const navItems = [
 
 export function MarketingHeader({ user }: MarketingHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-primary/10 bg-[#EEF2FF]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[rgba(2,6,23,0.72)] backdrop-blur-2xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3 transition-transform hover:-translate-y-0.5">
-          <div className="flex size-11 items-center justify-center rounded-[1.35rem] border border-primary/15 bg-white/80 text-primary shadow-lg shadow-primary/10">
+          <div className="flex size-11 items-center justify-center rounded-[1.35rem] border border-white/12 bg-white/8 text-primary shadow-lg shadow-black/20">
             <CastleIcon className="size-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-[family-name:var(--font-baloo)] text-2xl leading-none text-foreground">
+            <span className="font-[family-name:var(--font-baloo)] text-2xl leading-none text-white">
               Palace
             </span>
-            <span className="hidden text-xs text-muted-foreground sm:block">
+            <span className="hidden text-xs text-white/55 sm:block">
               Study worlds with sticky recall
             </span>
           </div>
@@ -37,12 +37,13 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
             <Button
               key={label}
               variant="ghost"
-              render={<a href={href} />}
-              nativeButton={false}
-              className="rounded-full px-3 text-sm text-muted-foreground hover:bg-white/70 hover:text-foreground"
+              asChild
+              className="rounded-full px-3 text-sm text-white/68 hover:bg-white/8 hover:text-white"
             >
+              <a href={href}>
               <Icon className="size-4 text-primary/70" />
               {label}
+              </a>
             </Button>
           ))}
         </nav>
@@ -52,11 +53,12 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
             <>
               <Button
                 variant="outline"
-                render={<Link href="/dashboard" />}
-                nativeButton={false}
-                className="hidden rounded-full border-primary/15 bg-white/70 px-4 sm:inline-flex"
+                asChild
+                className="hidden rounded-full border-white/12 bg-white/8 px-4 text-white hover:bg-white/12 hover:text-white sm:inline-flex"
               >
+                <Link href="/dashboard">
                 My Memory Palaces
+                </Link>
               </Button>
               <UserDropdown user={user} />
             </>
@@ -64,18 +66,20 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
             <>
               <Button
                 variant="ghost"
-                render={<Link href="/login" />}
-                nativeButton={false}
-                className="rounded-full text-muted-foreground hover:bg-white/70 hover:text-foreground"
+                asChild
+                className="rounded-full text-white/72 hover:bg-white/8 hover:text-white"
               >
+                <Link href="/login">
                 Log in
+                </Link>
               </Button>
               <Button
-                render={<Link href="/signup" />}
-                nativeButton={false}
+                asChild
                 className="rounded-full bg-primary px-4 text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
               >
+                <Link href="/signup">
                 Start building
+                </Link>
               </Button>
             </>
           )}

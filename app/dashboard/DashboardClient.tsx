@@ -1,36 +1,14 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, Paperclip, Home, FolderOpen, BookOpen, LogOut } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, Paperclip, Home, FolderOpen, BookOpen } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { User } from "@supabase/supabase-js"
 import { Avatar, AvatarFallback } from "@/components/ui/glass/avatar"
-import {
-  DropdownMenuGroup,
-} from "@/components/ui/dropdown-menu"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/glass/dropdown-menu"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/glass/tabs"
-import DragonSceneLoader from "../components/DragonSceneLoader"
-
-// ─── Color palette (warm zinc + blue, Notion/Arc-inspired) ───────────────────
-// bg:          #f7f7f5  warm off-white
-// card:        #ffffff  white
-// nav:         #ffffff  white with border #e4e4e0
-// border:      #e4e4e0  zinc-ish warm gray
-// hover-border:#d4d4d0  slightly darker
-// text-primary:#18181b  zinc-900
-// text-muted:  #71717a  zinc-500
-// text-dim:    #a1a1aa  zinc-400
-// accent:      #2563eb  blue-600
-// accent-hover:#1d4ed8  blue-700
+import DragonSceneLoader from "@/components/dragon-scene-loader"
+import { UserDropdown } from "@/components/user-dropdown"
+import { clearLandingDraft, loadLandingDraft } from "@/lib/landing-draft"
 
 interface Palace {
   id: string
@@ -38,25 +16,25 @@ interface Palace {
   prompt: string
   status: string
   _count?: { rooms: number }
-  testSessions?: { scorePct: number }[]
+  testSessions?: { scorePct: number | null }[]
 }
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'ready') return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f0fdf4] border border-[#86efac] text-[#16a34a] text-[10px] font-bold tracking-widest uppercase">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]" />
+    <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
       Operational
     </div>
   )
   if (status === 'processing') return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#eff6ff] border border-[#93c5fd] text-[#2563eb] text-[10px] font-bold tracking-widest uppercase">
-      <RotateCw className="w-3 h-3 animate-spin" />
+    <div className="flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+      <RotateCw className="h-3 w-3 animate-spin" />
       Drafting Space
     </div>
   )
   if (status === 'error') return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#fef2f2] border border-[#fca5a5] text-[#dc2626] text-[10px] font-bold tracking-widest uppercase">
-      <span className="w-3 h-3 flex items-center justify-center rounded-full border border-[#dc2626] text-[8px] font-black">!</span>
+    <div className="flex items-center gap-1.5 rounded-full border border-rose-400/35 bg-rose-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-rose-200">
+      <span className="flex h-3 w-3 items-center justify-center rounded-full border border-rose-300 text-[8px] font-black">!</span>
       Structural Error
     </div>
   )
@@ -70,7 +48,7 @@ function RetentionRing({ pct }: { pct: number }) {
   return (
     <div className="relative w-12 h-12 flex-shrink-0">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
-        <circle cx="24" cy="24" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3.5" />
+        <circle cx="24" cy="24" r={r} fill="none" stroke="color-mix(in srgb, var(--dashboard-text-soft) 18%, transparent)" strokeWidth="3.5" />
         <circle cx="24" cy="24" r={r} fill="none" stroke="var(--glass-accent)" strokeWidth="3.5"
           strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
       </svg>
@@ -176,69 +154,100 @@ const NAV_TABS = [
   { value: "prompt-library", label: "Prompt Library", icon: BookOpen },
 ]
 
-function AvatarMenu({ initials, email }: { initials: string, email: string | null }) {
-  const router = useRouter()
-  const [isPending, startTransition] = useTransition()
-  const displayName = email?.split("@")[0]?.replace(/[._-]+/g, " ") || "Palace user"
-
-  function handleSignOut() {
-    startTransition(async () => {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.replace("/")
-      router.refresh()
-    })
-  }
-
+function DashboardHeader({
+  activeNavTab,
+  onNavChange,
+  user,
+}: {
+  activeNavTab: string
+  onNavChange: (value: string) => void
+  user: User | null
+}) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            aria-label="Open profile menu"
-            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          />
-        }
-      >
-        <Avatar size="md" glow>
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
-      </DropdownMenuTrigger>
+    <header className="sticky top-0 z-40 border-b border-border bg-[color:color-mix(in_srgb,var(--dashboard-surface-strong)_92%,transparent)] backdrop-blur-2xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/palace_logo.png" alt="Palace" className="h-14 w-auto sm:h-16" />
+        </div>
 
-      <DropdownMenuContent align="end" sideOffset={12} className="w-64">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>
-            <p className="glass-text-soft">Profile</p>
-            <p className="truncate text-foreground">{displayName}</p>
-            {email ? (
-              <p className="truncate text-xs text-muted-foreground">{email}</p>
-            ) : null}
-          </DropdownMenuLabel>
-        </DropdownMenuGroup>
+        <nav
+          aria-label="Dashboard navigation"
+          className="hidden items-center gap-1 md:flex"
+        >
+          {NAV_TABS.map(({ value, label, icon: Icon }) => {
+            const isActive = value === activeNavTab
 
-        <DropdownMenuSeparator />
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onNavChange(value)}
+                aria-current={isActive ? "page" : undefined}
+                className={[
+                  "flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "dashboard-accent-pill text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    : "dashboard-text-soft hover:bg-[color:color-mix(in_srgb,var(--dashboard-surface)_72%,transparent)] hover:text-foreground",
+                ].join(" ")}
+              >
+                <Icon className="size-4" />
+                <span>{label}</span>
+              </button>
+            )
+          })}
+        </nav>
 
-        <DropdownMenuGroup>
-          <DropdownMenuItem disabled={isPending} onClick={handleSignOut}>
-            <LogOut />
-            {isPending ? "Signing out..." : "Sign out"}
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <div className="flex items-center gap-3">
+          <div className="hidden text-right md:block">
+            <div className="dashboard-text-soft text-[10px] font-semibold uppercase tracking-[0.28em]">
+              Dashboard
+            </div>
+            <div className="dashboard-text-muted text-sm">
+              Memory Palace Workspace
+            </div>
+          </div>
+          {user ? (
+            <UserDropdown user={user} />
+          ) : (
+            <Avatar size="md" glow className="ring-1 ring-border">
+              <AvatarFallback className="bg-[radial-gradient(circle_at_top,color-mix(in_srgb,var(--dashboard-accent)_35%,white),color-mix(in_srgb,var(--dashboard-surface-strong)_92%,black))] font-semibold text-foreground">
+                ?
+              </AvatarFallback>
+            </Avatar>
+          )}
+        </div>
+      </div>
+
+      <div className="mx-auto flex max-w-7xl gap-2 px-4 pb-3 md:hidden sm:px-6 lg:px-8">
+        {NAV_TABS.map(({ value, label, icon: Icon }) => {
+          const isActive = value === activeNavTab
+
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onNavChange(value)}
+              aria-current={isActive ? "page" : undefined}
+              className={[
+                "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
+                isActive
+                  ? "dashboard-accent-pill text-foreground"
+                  : "dashboard-surface dashboard-text-soft",
+              ].join(" ")}
+            >
+              <Icon className="size-3.5 shrink-0" />
+              <span className="truncate">{label}</span>
+            </button>
+          )
+        })}
+      </div>
+    </header>
   )
 }
-
-function getInitials(email: string | null) {
-  if (!email) return "?"
-  const local = email.split("@")[0]
-  const parts = local.split(/[._-]/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return local.slice(0, 2).toUpperCase()
-}
-
-export default function DashboardClient({ initialPalaces, userEmail }: { initialPalaces: Palace[], userEmail: string | null }) {
+export default function DashboardClient({ initialPalaces, user }: { initialPalaces: Palace[], user: User | null }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [palaces, setPalaces] = useState(initialPalaces)
   const [inputText, setInputText] = useState("")
   const [activeNavTab, setActiveNavTab] = useState("home")
@@ -247,23 +256,43 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+  const hasHandledLandingIntent = useRef(false)
 
-  async function handleGenerate() {
-    if (!inputText.trim() || isGenerating) return
+  useEffect(() => {
+    const root = document.documentElement
+    const body = document.body
+
+    root.classList.add("dark")
+    body.classList.add("dark")
+
+    return () => {
+      root.classList.remove("dark")
+      body.classList.remove("dark")
+    }
+  }, [])
+
+  async function generatePalace(prompt: string, files: File[] = []) {
+    const trimmedPrompt = prompt.trim()
+
+    if (!trimmedPrompt || isGenerating) {
+      return false
+    }
+
     setIsGenerating(true)
     setGenerateError(null)
+
     try {
       const formData = new FormData()
-      formData.append('prompt', inputText)
-      attachedFiles.forEach(f => formData.append('files', f))
+      formData.append('prompt', trimmedPrompt)
+      files.forEach(f => formData.append('files', f))
       const res = await fetch('/api/palaces/generate', {
         method: 'POST',
         body: formData,
       })
       if (!res.ok) {
-        const err = await res.json()
-        setGenerateError(err.error ?? 'Something went wrong')
-        return
+        const err = await res.json().catch(() => null) as { error?: string } | null
+        setGenerateError(err?.error ?? 'Something went wrong')
+        return false
       }
       const data = await res.json()
       setPalaces(prev => [{
@@ -274,38 +303,68 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
         _count: { rooms: 0 },
         testSessions: [],
       }, ...prev])
-      setInputText("")
-      setAttachedFiles([])
+      return true
     } catch {
       setGenerateError('Network error — please try again')
+      return false
     } finally {
       setIsGenerating(false)
     }
   }
 
+  async function handleGenerate() {
+    const created = await generatePalace(inputText, attachedFiles)
+
+    if (created) {
+      setInputText("")
+      setAttachedFiles([])
+    }
+  }
+
+  useEffect(() => {
+    if (!user || hasHandledLandingIntent.current) {
+      return
+    }
+
+    if (searchParams.get("intent") !== "create-palace") {
+      return
+    }
+
+    hasHandledLandingIntent.current = true
+
+    void (async () => {
+      const draft = await loadLandingDraft()
+
+      if (!draft?.prompt.trim()) {
+        router.replace("/dashboard")
+        return
+      }
+
+      setInputText(draft.prompt)
+      setAttachedFiles(draft.files)
+
+      const created = await generatePalace(draft.prompt, draft.files)
+
+      if (created) {
+        await clearLandingDraft()
+        setInputText("")
+        setAttachedFiles([])
+      }
+
+      router.replace("/dashboard")
+    })()
+  }, [router, searchParams, user])
+
   return (
     <div className="dark glass-page min-h-screen font-sans text-foreground">
-      {/* Nav */}
-      <nav className="glass-panel flex items-center justify-between px-6 py-4 absolute top-0 inset-x-0 z-20">
-        <div className="flex items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/palace_logo.png" alt="Palace" className="h-20 w-auto" />
-        </div>
-        <Tabs value={activeNavTab} onValueChange={setActiveNavTab}>
-          <TabsList>
-            {NAV_TABS.map(({ value, label, icon: Icon }) => (
-              <TabsTrigger key={value} value={value}>
-                <Icon data-icon="inline-start" />
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <AvatarMenu initials={getInitials(userEmail)} email={userEmail} />
-      </nav>
+        <DashboardHeader
+          activeNavTab={activeNavTab}
+          onNavChange={setActiveNavTab}
+          user={user}
+        />
 
       {/* Hero with dragon scene background */}
-      <div className="relative overflow-hidden" style={{ height: 1050 }}>
+      <div className="relative overflow-hidden" style={{ minHeight: 980 }}>
         {/* Dragon scene fills the hero */}
         <div className="absolute inset-0 bg-background">
           <DragonSceneLoader />
@@ -316,7 +375,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
         <div className="absolute inset-x-0 bottom-0 h-48" style={{ background: "linear-gradient(to top, var(--glass-page-bg), transparent)" }} />
 
         {/* Hero content */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-full px-6 pb-8 pt-16">
+        <div className="relative z-10 flex min-h-[980px] flex-col items-center justify-center px-6 pb-16 pt-20">
           <h1 className="mb-3 text-center text-6xl leading-tight font-black tracking-tight text-foreground drop-shadow-lg">
             Think it. Explore it.
           </h1>
@@ -325,18 +384,18 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
           </p>
 
           {/* Input box */}
-          <div className="glass-panel-strong mb-5 w-full max-w-2xl overflow-hidden rounded-2xl">
+          <div className="dashboard-panel mb-5 w-full max-w-3xl overflow-hidden rounded-[30px] backdrop-blur-[32px]">
             <textarea
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               placeholder="Describe the palace you want to create..."
-              className="min-h-[100px] w-full resize-none bg-transparent px-5 pt-5 pb-3 text-base text-foreground outline-none placeholder:text-muted-foreground"
+              className="min-h-[130px] w-full resize-none bg-transparent px-6 pt-6 pb-4 text-base text-foreground outline-none placeholder:text-[color:var(--dashboard-text-soft)]"
             />
-            <div className="flex items-center justify-between px-4 pb-4">
+            <div className="flex items-center justify-between border-t border-border bg-[color:color-mix(in_srgb,var(--dashboard-surface-alt)_72%,transparent)] px-5 pb-5 pt-4">
               <div className="flex items-center gap-3">
-                <label className="flex cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
-                  <Paperclip className="w-4 h-4" />
-                  <span className="text-xs">
+                <label className="dashboard-pill flex cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-xs transition-colors hover:text-foreground">
+                  <Paperclip className="h-4 w-4" />
+                  <span>
                     {attachedFiles.length > 0
                       ? `${attachedFiles.length} file${attachedFiles.length > 1 ? 's' : ''} attached`
                       : 'add an attachment (.pdf, .txt, and .md)'}
@@ -352,7 +411,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
               </div>
               <button
                 onClick={handleGenerate}
-                className="flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
+                className="flex h-12 items-center gap-2 rounded-full border border-primary/35 bg-primary/18 px-5 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors hover:bg-primary/24 disabled:opacity-30"
                 disabled={!inputText.trim() || isGenerating}
               >
                 {isGenerating ? (
@@ -375,7 +434,10 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
           {/* Quick action pills */}
           <div className="flex items-center justify-center gap-3">
             {["Recreate Screenshot", "Import from Site", "Explore Effects"].map(label => (
-              <button key={label} className="glass-pill glass-interactive rounded-full px-4 py-2 text-sm text-foreground">
+              <button
+                key={label}
+                className="dashboard-pill rounded-full px-4 py-2 text-sm backdrop-blur-xl transition-colors hover:text-foreground"
+              >
                 {label}
               </button>
             ))}
@@ -384,10 +446,20 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
       </div>
 
       {/* Recent Palaces */}
-      <div className="max-w-7xl mx-auto px-6 mb-16 pt-10">
-        <h2 className="mb-6 text-2xl font-bold text-foreground">Recent Palaces</h2>
+      <section className="mx-auto mb-16 max-w-7xl px-6 pt-12">
+        <div className="mb-6 flex items-end justify-between gap-6">
+          <div>
+            <p className="dashboard-heading-kicker mb-2 text-[11px] font-semibold uppercase tracking-[0.28em]">
+              Workspace
+            </p>
+            <h2 className="text-3xl font-bold text-foreground">Recent Palaces</h2>
+          </div>
+          <p className="dashboard-text-muted hidden max-w-md text-right text-sm lg:block">
+            Track your latest builds, revisit unstable memory spaces, and continue training where recall is weakest.
+          </p>
+        </div>
         {palaces.length === 0 ? (
-          <div className="glass-panel text-center rounded-2xl border-dashed py-16 text-muted-foreground">
+          <div className="dashboard-panel dashboard-text-muted rounded-[28px] py-16 text-center">
             No palaces yet — describe one above to get started.
           </div>
         ) : (
@@ -395,15 +467,21 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             {palaces.map(p => <PalaceCard key={p.id} palace={p} />)}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Discover Prompts */}
-      <div className="max-w-7xl mx-auto px-6 pb-20">
+      <section className="mx-auto max-w-7xl px-6 pb-16">
+        <div className="dashboard-panel rounded-[32px] px-6 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-black tracking-widest uppercase text-foreground">Discover Palace Prompts</h2>
-          <div className="glass-pill flex w-64 items-center gap-2 rounded-full px-4 py-2">
-            <Search className="glass-text-soft h-4 w-4" />
-            <input placeholder="Search prompts..." className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+          <div>
+            <p className="dashboard-heading-kicker mb-2 text-[11px] font-semibold uppercase tracking-[0.28em]">
+              Inspiration
+            </p>
+            <h2 className="text-2xl font-black tracking-widest uppercase text-foreground">Discover Palace Prompts</h2>
+          </div>
+          <div className="dashboard-pill flex w-72 items-center gap-2 rounded-full px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <Search className="dashboard-text-soft h-4 w-4" />
+            <input placeholder="Search prompts..." className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[color:var(--dashboard-text-soft)]" />
           </div>
         </div>
 
@@ -412,7 +490,11 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
-              className={`rounded-full px-4 py-2 text-sm font-bold tracking-wider transition-colors ${activeFilter === tab ? 'bg-background text-foreground shadow-sm' : 'glass-pill glass-interactive text-muted-foreground hover:text-foreground'}`}
+              className={`rounded-full border px-4 py-2 text-sm font-bold tracking-wider transition-colors ${
+                activeFilter === tab
+                  ? "dashboard-accent-pill shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                  : "dashboard-pill"
+              }`}
             >
               {tab}
             </button>
@@ -421,17 +503,21 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {PROMPTS.map(p => (
-            <div key={p.title} className="glass-panel glass-interactive group overflow-hidden rounded-2xl">
+            <div
+              key={p.title}
+              className="dashboard-panel group overflow-hidden rounded-[26px] transition-transform duration-200 hover:-translate-y-1"
+            >
               <div className="relative h-44 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.img} alt={p.title} className="w-full h-full object-cover opacity-50 group-hover:opacity-65 transition-opacity" />
+                <img src={p.img} alt={p.title} className="h-full w-full object-cover opacity-58 transition-opacity group-hover:opacity-72" />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/36 to-transparent" />
               </div>
               <div className="p-4">
                 <div className="mb-1 text-sm font-black tracking-wider uppercase text-foreground">{p.title}</div>
-                <div className="glass-text-soft mb-4 text-[10px] leading-relaxed font-bold tracking-widest uppercase">{p.desc}</div>
+                <div className="dashboard-text-soft mb-4 text-[10px] font-bold uppercase leading-relaxed tracking-widest">{p.desc}</div>
                 <button
                   onClick={() => { setInputText(`Create a palace inspired by: ${p.title}. ${p.desc}`); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                  className="glass-pill glass-interactive flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-foreground"
+                  className="dashboard-pill flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium hover:border-primary/35"
                 >
                   + Use Prompt
                 </button>
@@ -439,7 +525,34 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             </div>
           ))}
         </div>
-      </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-border bg-[color:color-mix(in_srgb,var(--dashboard-surface-strong)_96%,transparent)]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="dashboard-heading-kicker text-[11px] font-semibold uppercase tracking-[0.28em]">
+              Palace
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-foreground">Build better memory spaces.</h3>
+            <p className="dashboard-text-muted mt-2 max-w-md text-sm">
+              Create, test, and refine memory palaces with a darker workspace tuned for focus and recall.
+            </p>
+          </div>
+
+          <div className="dashboard-text-muted flex flex-wrap items-center gap-3 text-sm">
+            <span className="dashboard-pill rounded-full px-3 py-1.5">
+              AI workspace
+            </span>
+            <span className="dashboard-pill rounded-full px-3 py-1.5">
+              Recall training
+            </span>
+            <span className="dashboard-pill rounded-full px-3 py-1.5">
+              Supabase-backed
+            </span>
+          </div>
+        </div>
+      </footer>
 
       {showCreateModal && (
         <CreatePalaceModal

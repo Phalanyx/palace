@@ -3,12 +3,17 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { FormEvent, useMemo, useState } from "react"
-import { AlertCircleIcon, LoaderCircleIcon, SparklesIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  LoaderCircleIcon,
+  LockKeyholeIcon,
+  MailIcon,
+  SparklesIcon,
+} from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -31,10 +36,11 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
   const [isGooglePending, setIsGooglePending] = useState(false)
 
   const isSignup = mode === "signup"
-  const title = isSignup ? "Create your palace" : "Welcome back"
+  const title = isSignup ? "Create your account" : "Login to your account"
   const description = isSignup
-    ? "Start turning your study material into a guided memory world."
-    : "Pick up your learning palaces right where you left off."
+    ? "Start building memory palaces."
+    : "Enter your email below to login to your account."
+  const alternateHref = `${isSignup ? "/login" : "/signup"}?next=${encodeURIComponent(nextPath)}`
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -118,111 +124,142 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
   }
 
   return (
-    <Card className="border-border/70 bg-card/95 shadow-2xl backdrop-blur">
-      <CardHeader className="gap-3">
-        <CardTitle className="font-[family-name:var(--font-baloo)] text-3xl">
-          {title}
-        </CardTitle>
-        <CardDescription className="text-base">
-          {description}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4">
-        <div className="mx-auto flex w-full max-w-[400px] flex-col gap-5">
-          {error ? (
-            <Alert variant="destructive">
-              <AlertCircleIcon />
-              <AlertTitle>There was a problem</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+    <section className="auth-form-card">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
+        <p className="text-sm leading-6 text-white/60">{description}</p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {error ? (
+          <Alert variant="destructive" className="auth-alert auth-alert-destructive">
+            <AlertCircleIcon />
+            <AlertTitle>There was a problem</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {message ? (
+          <Alert className="auth-alert">
+            <SparklesIcon />
+            <AlertTitle>Check your inbox</AlertTitle>
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="auth-google-button"
+            onClick={handleGoogleRedirectSignIn}
+            disabled={isPending || isGooglePending}
+          >
+            <GoogleIcon />
+            {isGooglePending ? "Loading..." : "Continue with Google"}
+          </Button>
+
+          {isGooglePending ? (
+            <div className="flex items-center gap-2 text-sm text-white/55">
+              <LoaderCircleIcon className="animate-spin" />
+              Finishing Google sign-in...
+            </div>
           ) : null}
+        </div>
 
-          {message ? (
-            <Alert>
-              <SparklesIcon />
-              <AlertTitle>Check your inbox</AlertTitle>
-              <AlertDescription>{message}</AlertDescription>
-            </Alert>
-          ) : null}
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1 bg-white/10" />
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white/35">
+            or
+          </span>
+          <Separator className="flex-1 bg-white/10" />
+        </div>
 
-          <div className="w-full space-y-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="h-11 w-full rounded-2xl border-[#D7DDF8] bg-white text-foreground hover:bg-white"
-              onClick={handleGoogleRedirectSignIn}
-              disabled={isPending || isGooglePending}
-            >
-              {isGooglePending ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}
-            </Button>
-            {isGooglePending ? (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircleIcon className="animate-spin" />
-                Finishing Google sign-in...
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
-              Or with email
-            </span>
-            <Separator className="flex-1" />
-          </div>
-
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`${mode}-email`}>Email</Label>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`${mode}-email`} className="text-white/75">
+              Email
+            </Label>
+            <div className="auth-input-wrap">
+              <MailIcon className="auth-input-icon" />
               <Input
                 id={`${mode}-email`}
                 type="email"
-                placeholder="you@example.com"
+                placeholder="m@example.com"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                className="auth-input"
               />
             </div>
+          </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`${mode}-password`}>Password</Label>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center">
+              <Label htmlFor={`${mode}-password`} className="text-white/75">
+                Password
+              </Label>
+            </div>
+            <div className="auth-input-wrap">
+              <LockKeyholeIcon className="auth-input-icon" />
               <Input
                 id={`${mode}-password`}
                 type="password"
-                placeholder="At least 6 characters"
+                placeholder={isSignup ? "At least 6 characters" : ""}
                 autoComplete={isSignup ? "new-password" : "current-password"}
                 minLength={6}
                 required
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                className="auth-input"
               />
             </div>
+          </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              className="mt-2 h-11 w-full rounded-2xl"
-              disabled={isPending || isGooglePending}
-            >
-              {isPending ? "Loading..." : isSignup ? "Create account" : "Log in"}
-            </Button>
-          </form>
-        </div>
-      </CardContent>
-      <CardFooter className="justify-between gap-3">
-        <span className="text-sm text-muted-foreground">
-          {isSignup ? "Already have an account?" : "Need an account?"}
-        </span>
-        <Button
-          variant="ghost"
-          render={<Link href={isSignup ? "/login" : "/signup"} />}
-          nativeButton={false}
-        >
-          {isSignup ? "Log in" : "Sign up"}
+          <Button
+            type="submit"
+            size="lg"
+            className="auth-submit-button"
+            disabled={isPending || isGooglePending}
+          >
+            {isPending ? "Loading..." : isSignup ? "Sign up" : "Login"}
+          </Button>
+        </form>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 text-sm text-white/55">
+        <span>{isSignup ? "Have an account?" : "Don't have an account?"}</span>
+        <Button variant="ghost" asChild className="h-auto px-1 py-0 text-white hover:bg-transparent hover:text-white">
+          <Link href={alternateHref}>
+            {isSignup ? "Sign in" : "Sign up"}
+          </Link>
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </section>
+  )
+}
+
+function GoogleIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 shrink-0">
+      <path
+        d="M21.8 12.23c0-.77-.07-1.5-.2-2.2H12v4.16h5.49a4.7 4.7 0 0 1-2.04 3.08v2.56h3.3c1.93-1.78 3.05-4.4 3.05-7.6Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 22c2.76 0 5.08-.92 6.77-2.49l-3.3-2.56c-.92.62-2.08.98-3.47.98-2.66 0-4.92-1.8-5.73-4.22H2.86v2.64A10.22 10.22 0 0 0 12 22Z"
+        fill="#34A853"
+      />
+      <path
+        d="M6.27 13.7A6.14 6.14 0 0 1 5.95 12c0-.6.11-1.18.32-1.7V7.66H2.86A10.22 10.22 0 0 0 1.8 12c0 1.63.39 3.18 1.06 4.34l3.41-2.64Z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 6.07c1.5 0 2.84.52 3.9 1.53l2.92-2.92C17.07 3.04 14.76 2 12 2 7.95 2 4.45 4.32 2.86 7.66l3.41 2.64C7.08 7.87 9.34 6.07 12 6.07Z"
+        fill="#EA4335"
+      />
+    </svg>
   )
 }

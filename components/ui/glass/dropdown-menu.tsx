@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   DropdownMenu as BaseDropdownMenu,
   DropdownMenuContent as BaseDropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -45,6 +46,7 @@ DropdownMenuContent.displayName = "DropdownMenuContent"
 
 export {
   BaseDropdownMenu as DropdownMenu,
+  DropdownMenuGroup,
   DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuLabel,

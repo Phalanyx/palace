@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 
+import { getSafeNextPath } from "@/lib/auth-redirect"
 import { getSupabaseEnv } from "@/lib/supabase/env"
 
 const publicRoutes = new Set(["/", "/login", "/signup", "/auth/callback"])
@@ -54,7 +55,6 @@ export async function middleware(request: NextRequest) {
   const isApiRoute = pathname.startsWith("/api/")
   const isAuthPage = pathname === "/login" || pathname === "/signup"
 
-/*
   if (!user && !isPublic) {
     if (isApiRoute) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -64,10 +64,10 @@ export async function middleware(request: NextRequest) {
     redirectUrl.searchParams.set("next", `${pathname}${search}`)
     return NextResponse.redirect(redirectUrl)
   }
-*/
 
   if (user && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+    const nextPath = getSafeNextPath(request.nextUrl.searchParams.get("next"))
+    return NextResponse.redirect(new URL(nextPath, request.url))
   }
 
   return response
