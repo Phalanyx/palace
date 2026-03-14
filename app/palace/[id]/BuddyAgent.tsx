@@ -5,6 +5,11 @@ import { Mic, MicOff, Phone, PhoneOff, ChevronDown, Send, Bot } from 'lucide-rea
 import { GeminiLiveClient } from '@/lib/gemini-live-client';
 import { AudioStreamer, AudioPlayer } from '@/lib/media-utils';
 import { buildSystemPrompt, type BuddyContextInput } from './BuddyContext';
+import { useAudioLevel } from './useAudioLevel';
+import dynamic from 'next/dynamic';
+import type { OrbState } from './VoiceOrb';
+
+const VoiceOrb = dynamic(() => import('./VoiceOrb'), { ssr: false });
 
 interface RoomObject {
   label: string;
@@ -64,6 +69,16 @@ export default function BuddyAgent({
   const [statusText, setStatusText] = useState('Disconnected');
   const [error, setError] = useState<string | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [inputAnalyser, setInputAnalyser] = useState<AnalyserNode | null>(null);
+  const [outputAnalyser, setOutputAnalyser] = useState<AnalyserNode | null>(null);
+
+  const inputLevel = useAudioLevel(inputAnalyser);
+  const outputLevel = useAudioLevel(outputAnalyser);
+
+  const orbState: OrbState = !connected ? 'idle'
+    : outputLevel > 0.05 ? 'speaking'
+    : micActive && inputLevel > 0.05 ? 'listening'
+    : 'idle';
 
   const clientRef = useRef<GeminiLiveClient | null>(null);
   const streamerRef = useRef<AudioStreamer | null>(null);
@@ -78,6 +93,7 @@ export default function BuddyAgent({
   const pointerDownPosRef = useRef({ x: 0, y: 0 });
   const didDragRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const orbRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Initialize position after mount
@@ -85,17 +101,19 @@ export default function BuddyAgent({
     setPos({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
   }, []);
 
-  // Drag handlers
+  // Drag handlers — offset is always relative to the orb element (stable 56×56)
   useEffect(() => {
     function onPointerMove(e: PointerEvent) {
       if (!isDraggingRef.current) return;
       const dx = Math.abs(e.clientX - pointerDownPosRef.current.x);
       const dy = Math.abs(e.clientY - pointerDownPosRef.current.y);
       if (dx > 4 || dy > 4) didDragRef.current = true;
-      setPos({
-        x: e.clientX - dragOffsetRef.current.x,
-        y: e.clientY - dragOffsetRef.current.y,
-      });
+
+      // Clamp so orb stays fully on-screen (pos = bottom-right corner of orb)
+      const orbSize = 56;
+      const nx = Math.max(orbSize, Math.min(window.innerWidth, e.clientX - dragOffsetRef.current.x));
+      const ny = Math.max(orbSize, Math.min(window.innerHeight, e.clientY - dragOffsetRef.current.y));
+      setPos({ x: nx, y: ny });
     }
     function onPointerUp() {
       isDraggingRef.current = false;
@@ -112,12 +130,19 @@ export default function BuddyAgent({
     isDraggingRef.current = true;
     didDragRef.current = false;
     pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
-    const rect = containerRef.current?.getBoundingClientRect();
-    dragOffsetRef.current = {
-      x: e.clientX - (rect?.left ?? e.clientX),
-      y: e.clientY - (rect?.top ?? e.clientY),
-    };
-    (e.target as Element).setPointerCapture(e.pointerId);
+    // Always compute offset relative to the orb, not the container (which changes size when panel opens)
+    const rect = orbRef.current?.getBoundingClientRect();
+    if (rect) {
+      // pos is bottom-right of orb (due to translate(-100%,-100%)), so offset from bottom-right corner
+      dragOffsetRef.current = {
+        x: e.clientX - (rect.right),
+        y: e.clientY - (rect.bottom),
+      };
+    } else {
+      dragOffsetRef.current = { x: 0, y: 0 };
+    }
+    // Capture on the orb wrapper, not e.target (which may be inside the canvas)
+    orbRef.current?.setPointerCapture(e.pointerId);
   }
 
   function handleFloatClick() {
@@ -237,7 +262,9 @@ export default function BuddyAgent({
     playerRef.current = player;
 
     // Pre-initialize audio player (matches demo's explicit init pattern)
-    player.init().catch(console.error);
+    player.init().then(() => {
+      setOutputAnalyser(player.getAnalyser());
+    }).catch(console.error);
 
     client.onSetupComplete = () => {
       setConnected(true);
@@ -296,6 +323,8 @@ export default function BuddyAgent({
     clientRef.current = null;
     setConnected(false);
     setMicActive(false);
+    setInputAnalyser(null);
+    setOutputAnalyser(null);
     setStatusText('Disconnected');
     setMessages([]);
   }
@@ -306,12 +335,14 @@ export default function BuddyAgent({
       streamerRef.current?.stop();
       streamerRef.current = null;
       setMicActive(false);
+      setInputAnalyser(null);
       addMessage('Microphone off', 'system');
     } else {
       try {
         const streamer = new AudioStreamer(clientRef.current);
         await streamer.start();
         streamerRef.current = streamer;
+        setInputAnalyser(streamer.getAnalyser());
         setMicActive(true);
         addMessage('Microphone on — speak now', 'system');
       } catch (e: any) {
@@ -557,28 +588,16 @@ export default function BuddyAgent({
         </div>
       )}
 
-      {/* Floating button */}
-      <button
+      {/* Floating orb */}
+      <div
+        ref={orbRef}
         onPointerDown={handlePointerDown}
         onClick={handleFloatClick}
-        className="w-14 h-14 rounded-full flex items-center justify-center transition-all cursor-grab active:cursor-grabbing relative"
-        style={connected
-          ? micActive
-            ? { background: 'linear-gradient(135deg, #ef4444, #f97316)', boxShadow: '0 0 20px rgba(239,68,68,0.5)', border: '2px solid rgba(239,68,68,0.5)' }
-            : { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', boxShadow: '0 8px 25px rgba(99,102,241,0.4)', border: '2px solid rgba(99,102,241,0.5)' }
-          : { background: 'rgba(15,15,25,0.9)', boxShadow: '0 8px 25px rgba(0,0,0,0.3)', border: '2px solid rgba(99,102,241,0.3)', backdropFilter: 'blur(10px)' }
-        }
+        className="w-14 h-14 rounded-full cursor-grab active:cursor-grabbing relative touch-none"
+        style={{ overflow: 'hidden' }}
       >
-        {micActive ? (
-          <Mic className="w-6 h-6 text-white animate-pulse" />
-        ) : (
-          <Bot className="w-6 h-6" style={{ color: connected ? '#fff' : '#818cf8' }} />
-        )}
-        {connected && !micActive && (
-          <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2"
-            style={{ borderColor: 'rgba(15,15,25,0.9)' }} />
-        )}
-      </button>
+        <VoiceOrb state={orbState} inputLevel={inputLevel} outputLevel={outputLevel} />
+      </div>
     </div>
   );
 }

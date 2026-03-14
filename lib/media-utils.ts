@@ -13,6 +13,7 @@ export class AudioStreamer {
   private audioContext: AudioContext | null = null;
   private audioWorklet: AudioWorkletNode | null = null;
   private mediaStream: MediaStream | null = null;
+  private analyserNode: AnalyserNode | null = null;
   isStreaming = false;
   private readonly sampleRate = 16000; // Gemini requires 16kHz
 
@@ -71,9 +72,14 @@ export class AudioStreamer {
         }
       };
 
-      // Connect the audio graph
+      // Create analyser node for audio visualization
+      this.analyserNode = this.audioContext!.createAnalyser();
+      this.analyserNode.fftSize = 256;
+
+      // Connect the audio graph: source → analyser → worklet
       const source = this.audioContext!.createMediaStreamSource(this.mediaStream!);
-      source.connect(this.audioWorklet);
+      source.connect(this.analyserNode);
+      this.analyserNode.connect(this.audioWorklet);
 
       this.isStreaming = true;
       console.log('🎤 Audio streaming started');
@@ -89,6 +95,11 @@ export class AudioStreamer {
    */
   stop(): void {
     this.isStreaming = false;
+
+    if (this.analyserNode) {
+      this.analyserNode.disconnect();
+      this.analyserNode = null;
+    }
 
     if (this.audioWorklet) {
       this.audioWorklet.disconnect();
@@ -107,6 +118,10 @@ export class AudioStreamer {
     }
 
     console.log('🛑 Audio streaming stopped');
+  }
+
+  getAnalyser(): AnalyserNode | null {
+    return this.analyserNode;
   }
 
   /**
@@ -397,6 +412,7 @@ export class AudioPlayer {
   private audioContext: AudioContext | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private gainNode: GainNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
   private isInitialized = false;
   private initPromise: Promise<void> | null = null; // Guard against concurrent init calls
   private readonly sampleRate = 24000; // Gemini outputs at 24kHz
@@ -427,9 +443,14 @@ export class AudioPlayer {
         this.gainNode = this.audioContext!.createGain();
         this.gainNode.gain.value = this.volume;
 
-        // Connect nodes
+        // Create analyser node for audio visualization
+        this.analyserNode = this.audioContext!.createAnalyser();
+        this.analyserNode.fftSize = 256;
+
+        // Connect nodes: worklet → gain → analyser → destination
         this.workletNode.connect(this.gainNode);
-        this.gainNode.connect(this.audioContext!.destination);
+        this.gainNode.connect(this.analyserNode);
+        this.analyserNode.connect(this.audioContext!.destination);
 
         this.isInitialized = true;
         console.log('🔊 Audio player initialized');
@@ -500,7 +521,15 @@ export class AudioPlayer {
   /**
    * Clean up resources
    */
+  getAnalyser(): AnalyserNode | null {
+    return this.analyserNode;
+  }
+
   destroy(): void {
+    if (this.analyserNode) {
+      this.analyserNode.disconnect();
+      this.analyserNode = null;
+    }
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;
