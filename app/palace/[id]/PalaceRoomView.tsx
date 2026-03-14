@@ -517,22 +517,40 @@ export default function PalaceRoomView({
             )}
 
             {isTestMode && currentObj && (
-              <div className="bg-white/15 backdrop-blur-2xl rounded-2xl p-4 w-full max-w-xl border border-white/20 shadow-xl">
+              <div
+                className="rounded-2xl p-4 w-full max-w-xl shadow-xl"
+                style={{
+                  background: 'rgba(30, 30, 40, 0.65)',
+                  backdropFilter: 'blur(40px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 25px 50px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.2)',
+                }}
+              >
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-white capitalize text-base leading-tight mb-2">{currentObj.label}</h3>
                   <textarea
                     value={answers[currentObj.id] || ''}
                     onChange={e => setAnswers(a => ({ ...a, [currentObj.id]: e.target.value }))}
                     placeholder="Write your answer here..."
-                    className="w-full h-20 p-2.5 rounded-xl bg-white/10 text-white placeholder-white/30 border border-white/20 focus:outline-none focus:border-white/50 resize-none text-sm"
+                    className="w-full h-20 p-2.5 rounded-xl text-white placeholder-white/30 resize-none text-sm outline-none"
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                    }}
                   />
                 </div>
 
                 {isAtEnd && (
-                  <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
                     <button
                       onClick={submitAnswers}
-                      className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-2.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm"
+                      className="w-full font-bold py-2.5 rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2 text-sm"
+                      style={{
+                        background: 'rgba(255,255,255,0.18)',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        color: '#fff',
+                      }}
                     >
                       <Send className="w-4 h-4" /> Submit &amp; Grade
                     </button>
@@ -548,8 +566,8 @@ export default function PalaceRoomView({
         </>
       )}
 
-      {/* BuddyAgent — hidden during test mode */}
-      {appPhase !== 'test' && (
+      {/* BuddyAgent — only visible in explore mode */}
+      {appPhase === 'explore' && (
         <BuddyAgent
           palace={{ id: palaceId, title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
           currentRoom={activeRoom ?? null}
