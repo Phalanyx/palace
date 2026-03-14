@@ -232,13 +232,17 @@ export async function processDocuments(palaceId: string) {
       )
 
       for (const saved of savedObjects) {
-        const parts = allMeshes[saved.dbId] ?? [{ primitive: 'sphere' as const, color: '#ff00ff', position: [0, 0, 0] as [number, number, number], scale: [1.4, 1.4, 1.4] as [number, number, number] }]
-        const meshJson = JSON.stringify({ parts })
-        const meshPath = `meshes/${palace.id}/${saved.dbId}.json`
+        const meshData = allMeshes[saved.dbId];
+        const scriptContent = meshData ? meshData.code : `
+          const geometry = new THREE.BoxGeometry(1, 1, 1);
+          const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff });
+          return new THREE.Mesh(geometry, material);
+        `;
+        const meshPath = `meshes/${palace.id}/${saved.dbId}.js`;
 
         const { error: meshErr } = await supabase.storage
           .from('palace-models')
-          .upload(meshPath, meshJson, { contentType: 'application/json', upsert: true })
+          .upload(meshPath, scriptContent, { contentType: 'application/javascript', upsert: true })
 
         if (meshErr) {
           console.error(`  Mesh upload failed for "${saved.label}": ${meshErr.message}`)
