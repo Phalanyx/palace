@@ -1,9 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import Script from "next/script"
 import { useRouter } from "next/navigation"
-import { FormEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
+import { FormEvent, useMemo, useState } from "react"
 import { AlertCircleIcon, LoaderCircleIcon, SparklesIcon } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -21,68 +20,15 @@ interface AuthFormProps {
   nextPath?: string
 }
 
-interface GoogleCredentialResponse {
-  credential?: string
-}
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (options: {
-            client_id: string
-            callback: (response: GoogleCredentialResponse) => void
-            use_fedcm_for_prompt?: boolean
-            context?: "signin" | "signup" | "use"
-          }) => void
-          renderButton: (
-            parent: HTMLElement,
-            options: {
-              type?: "standard" | "icon"
-              theme?: "outline" | "filled_blue" | "filled_black"
-              size?: "large" | "medium" | "small"
-              text?:
-                | "signin_with"
-                | "signup_with"
-                | "continue_with"
-                | "signin"
-                | "signup"
-                | "continue"
-              shape?: "rectangular" | "pill" | "circle" | "square"
-              width?: number
-              logo_alignment?: "left" | "center"
-            }
-          ) => void
-        }
-      }
-    }
-  }
-}
-
 export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
-  const googleButtonRef = useRef<HTMLDivElement | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
   const [isGooglePending, setIsGooglePending] = useState(false)
-  const [isGoogleScriptLoaded, setIsGoogleScriptLoaded] = useState(false)
-  const [googleButtonWidth, setGoogleButtonWidth] = useState(0)
-  const [canRenderNativeGoogleButton, setCanRenderNativeGoogleButton] = useState(false)
-  const [hasRenderedNativeGoogleButton, setHasRenderedNativeGoogleButton] = useState(false)
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-  const googleGisAllowedOrigins = useMemo(
-    () =>
-      (process.env.NEXT_PUBLIC_GOOGLE_GIS_ALLOWED_ORIGINS ?? "http://127.0.0.1:3000")
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean),
-    []
-  )
 
   const isSignup = mode === "signup"
   const title = isSignup ? "Create your palace" : "Welcome back"
@@ -171,129 +117,8 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
     }
   }
 
-  const handleGoogleCredential = useEffectEvent(async (credentialResponse: GoogleCredentialResponse) => {
-    setError(null)
-    setMessage(null)
-    setIsGooglePending(true)
-
-    try {
-      if (!credentialResponse.credential) {
-        throw new Error("Google did not return an ID token.")
-      }
-
-      const { error: signInError } = await supabase.auth.signInWithIdToken({
-        provider: "google",
-        token: credentialResponse.credential,
-      })
-
-      if (signInError) {
-        throw signInError
-      }
-
-      router.replace(nextPath)
-      router.refresh()
-    } catch (oauthFailure) {
-      const messageText =
-        oauthFailure instanceof Error ? oauthFailure.message : "Google sign-in failed."
-      setError(messageText)
-    } finally {
-      setIsGooglePending(false)
-    }
-  })
-
-  useEffect(() => {
-    if (!googleButtonRef.current) {
-      return
-    }
-
-    const updateWidth = () => {
-      const nextWidth = Math.floor(googleButtonRef.current?.clientWidth ?? 0)
-      if (nextWidth > 0) {
-        setGoogleButtonWidth(nextWidth)
-      }
-    }
-
-    updateWidth()
-
-    const observer = new ResizeObserver(() => {
-      updateWidth()
-    })
-
-    observer.observe(googleButtonRef.current)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (window.google?.accounts.id) {
-      setIsGoogleScriptLoaded(true)
-    }
-  }, [])
-
-  useEffect(() => {
-    setCanRenderNativeGoogleButton(googleGisAllowedOrigins.includes(window.location.origin))
-  }, [googleGisAllowedOrigins])
-
-  useEffect(() => {
-    if (!canRenderNativeGoogleButton) {
-      setHasRenderedNativeGoogleButton(false)
-      return
-    }
-
-    if (
-      !canRenderNativeGoogleButton ||
-      !isGoogleScriptLoaded ||
-      !googleClientId ||
-      !googleButtonRef.current ||
-      !window.google?.accounts.id ||
-      googleButtonWidth <= 0
-    ) {
-      return
-    }
-
-    googleButtonRef.current.innerHTML = ""
-    setHasRenderedNativeGoogleButton(false)
-
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: handleGoogleCredential,
-      use_fedcm_for_prompt: true,
-      context: isSignup ? "signup" : "signin",
-    })
-
-    window.google.accounts.id.renderButton(googleButtonRef.current, {
-      type: "standard",
-      theme: "outline",
-      size: "large",
-      text: isSignup ? "signup_with" : "signin_with",
-      shape: "pill",
-      width: googleButtonWidth,
-      logo_alignment: "left",
-    })
-
-    const hasButtonContent = googleButtonRef.current.childElementCount > 0
-    if (hasButtonContent) {
-      setHasRenderedNativeGoogleButton(true)
-    }
-  }, [canRenderNativeGoogleButton, googleButtonWidth, googleClientId, isGoogleScriptLoaded, isSignup])
-
   return (
     <Card className="border-border/70 bg-card/95 shadow-2xl backdrop-blur">
-      {canRenderNativeGoogleButton ? (
-        <Script
-          src="https://accounts.google.com/gsi/client"
-          strategy="afterInteractive"
-          onLoad={() => {
-            setIsGoogleScriptLoaded(true)
-          }}
-          onReady={() => {
-            setIsGoogleScriptLoaded(true)
-          }}
-        />
-      ) : null}
-
       <CardHeader className="gap-3">
         <CardTitle className="font-[family-name:var(--font-baloo)] text-3xl">
           {title}
@@ -321,49 +146,21 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
           ) : null}
 
           <div className="w-full space-y-2">
-            {canRenderNativeGoogleButton && googleClientId ? (
-              <div className="relative w-full min-h-11">
-                <div
-                  ref={googleButtonRef}
-                  className={hasRenderedNativeGoogleButton
-                    ? "w-full min-h-11 rounded-2xl [&>div]:!w-full [&_iframe]:!w-full"
-                    : "absolute inset-0 opacity-0 pointer-events-none w-full min-h-11 rounded-2xl [&>div]:!w-full [&_iframe]:!w-full"}
-                />
-                {!hasRenderedNativeGoogleButton ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    className="h-11 w-full rounded-2xl"
-                    onClick={handleGoogleRedirectSignIn}
-                    disabled={isPending || isGooglePending}
-                  >
-                    {isGooglePending ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="h-11 w-full rounded-2xl"
-                onClick={handleGoogleRedirectSignIn}
-                disabled={isPending || isGooglePending}
-              >
-                {isGooglePending ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-11 w-full rounded-2xl border-[#D7DDF8] bg-white text-foreground hover:bg-white"
+              onClick={handleGoogleRedirectSignIn}
+              disabled={isPending || isGooglePending}
+            >
+              {isGooglePending ? "Loading..." : isSignup ? "Sign up with Google" : "Sign in with Google"}
+            </Button>
             {isGooglePending ? (
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircleIcon className="animate-spin" />
                 Finishing Google sign-in...
               </div>
-            ) : null}
-            {!googleClientId ? (
-              <p className="text-sm text-muted-foreground">
-                Add <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> to render the official Google sign-in button.
-              </p>
             ) : null}
           </div>
 
