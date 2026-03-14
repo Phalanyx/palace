@@ -72,7 +72,7 @@ IMPORTANT INSTRUCTIONS FOR THE CODE:
 1. You have access to the global \`THREE\` object. DO NOT import or require Three.js.
 2. Build expressive LOW-POLY shapes. DO NOT just stack primitive boxes and spheres! Choose geometries that perfectly represent the item's silhouette.
 3. CRITICAL: For circular geometries (CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, TubeGeometry, LatheGeometry), you MUST specify extremely low segment counts (e.g., 3, 4, 5, 6, 8 max!) to emphasize distinct flat faces. NEVER use 32, 16, or 24 segments. E.g., \`new THREE.CylinderGeometry(radius, radius, height, 6)\`.
-4. Keep the object roughly contained within a 2x2x2 bounding box around the origin (0, 0, 0).
+4. Keep the object roughly contained within a 1.5x1.5x1.5 bounding box around the origin (0, 0, 0).
 5. Apply expressive materials. Use \`THREE.MeshPhysicalMaterial\` with neon colors, high emissive values (\`emissive: new THREE.Color(...)\`, \`emissiveIntensity: 2.5\`), roughness, and metalness, so the objects glow beautifully in a dark scene. Use these colors as HEX (e.g. 0xff00ff). 
 6. CRITICAL: ALWAYS include \`flatShading: true\` in ALL \`THREE.MeshPhysicalMaterial\` options to enforce the low-poly aesthetic.
 7. Create an overarching \`THREE.Group\` to combine multiple meshes if needed, and finally \`return group;\` or \`return mesh;\` at the end of your code snippet.

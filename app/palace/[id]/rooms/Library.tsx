@@ -6,7 +6,7 @@ import { mat, matMetal, glow, jitter, addMesh, makeTorch, animateFlicker, Flicke
 import { DynamicObject } from '../DynamicObject';
 
 const LIBRARY_SLOTS: [number, number, number][] = [
-  [0, 2.5, 0],         // In the center (near crystal)
+  [0, 4.5, 4],         // Floating in front of the central monument
   [-6, 7.5, 2],        // On the left mezzanine
   [6, 7.5, 2],         // On the right mezzanine
   [-2.5, 2.5, 4],      // On the left reading desk

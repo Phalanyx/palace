@@ -132,7 +132,7 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
         });
       }}
     >
-      <primitive object={generatedObject} castShadow />
+      <primitive object={generatedObject} castShadow scale={[0.6, 0.6, 0.6]} />
 
       {/* Point light so it glows into the room */}
       <pointLight color={accentColor} intensity={20} distance={4} />
