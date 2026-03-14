@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -134,6 +134,7 @@ export default function PalaceRoomView({
   const [openObjectIds, setOpenObjectIds] = useState<Set<string>>(new Set());
   const controlsRef = useRef<any>(null);
   const cameraTargetRef = useRef(new THREE.Vector3(0, 3, 0));
+  const pendingObjectIdxRef = useRef<number | null>(null);
 
   const activeRoom = rooms[activeRoomIdx];
   const objects = activeRoom?.objects ?? [];
@@ -165,7 +166,12 @@ export default function PalaceRoomView({
   const isAtEnd = activeRoomIdx === rooms.length - 1 && activeObjectIdx === objects.length - 1;
 
   useEffect(() => {
-    setActiveObjectIdx(0);
+    if (pendingObjectIdxRef.current != null) {
+      setActiveObjectIdx(pendingObjectIdxRef.current);
+      pendingObjectIdxRef.current = null;
+    } else {
+      setActiveObjectIdx(0);
+    }
     if (cameraConfig) cameraTargetRef.current.set(...cameraConfig.target);
   }, [activeRoomIdx]);
 
@@ -536,15 +542,31 @@ export default function PalaceRoomView({
         </>
       )}
 
-      {/* BuddyAgent — always mounted to keep WS connection alive across phases */}
-      <BuddyAgent
-        palace={{ id: palaceId, title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
-        currentRoom={activeRoom ?? null}
-        selectedObject={currentObj ?? null}
-        openObjects={openObjects}
-        isTestMode={appPhase === 'test'}
-        currentTestQuestion={currentQuestion?.questionText}
-      />
+      {/* BuddyAgent — hidden during test mode */}
+      {appPhase !== 'test' && (
+        <BuddyAgent
+          palace={{ id: palaceId, title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
+          currentRoom={activeRoom ?? null}
+          selectedObject={currentObj ?? null}
+          openObjects={openObjects}
+          isTestMode={false}
+          currentTestQuestion={undefined}
+          rooms={rooms}
+          onNavigate={useCallback((roomIndex: number, objectIndex: number) => {
+            console.log('[NAV] onNavigate called:', { roomIndex, objectIndex });
+            setActiveRoomIdx(prev => {
+              if (prev === roomIndex) {
+                // Same room — set object directly
+                setActiveObjectIdx(objectIndex);
+                return prev;
+              }
+              // Different room — stash object for the effect
+              pendingObjectIdxRef.current = objectIndex;
+              return roomIndex;
+            });
+          }, [])}
+        />
+      )}
     </div>
   );
 }

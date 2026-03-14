@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff, Phone, PhoneOff, ChevronDown, Send, Bot } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, ChevronDown, Send, Bot, MapPin } from 'lucide-react';
 import { GeminiLiveClient } from '@/lib/gemini-live-client';
 import { AudioStreamer, AudioPlayer } from '@/lib/media-utils';
 import { buildSystemPrompt, type BuddyContextInput } from './BuddyContext';
@@ -42,14 +42,29 @@ interface BuddyAgentProps {
   openObjects: RoomObject[];
   isTestMode: boolean;
   currentTestQuestion?: string;
+  onNavigate?: (roomIndex: number, objectIndex: number) => void;
+  rooms?: Room[];
 }
 
-type MessageType = 'user' | 'user-transcript' | 'assistant' | 'system';
+type MessageType = 'user' | 'user-transcript' | 'assistant' | 'system' | 'nav-card';
 
 interface ChatMessage {
   text: string;
   type: MessageType;
   isFinished: boolean;
+  navRoomIndex?: number;
+  navObjectIndex?: number;
+}
+
+// Parse [NAV:roomIndex:objectIndex] from message text
+function parseNavMarker(text: string): { roomIndex: number; objectIndex: number; cleanText: string } | null {
+  const match = text.match(/\[NAV:(\d+):(\d+)\]/);
+  if (!match) return null;
+  return {
+    roomIndex: parseInt(match[1], 10),
+    objectIndex: parseInt(match[2], 10),
+    cleanText: text.replace(/\s*\[NAV:\d+:\d+\]\s*/g, '').trim(),
+  };
 }
 
 export default function BuddyAgent({
@@ -59,6 +74,8 @@ export default function BuddyAgent({
   openObjects,
   isTestMode,
   currentTestQuestion,
+  onNavigate,
+  rooms,
 }: BuddyAgentProps) {
   const [buddyMode, setBuddyMode] = useState<'explore' | 'quiz'>('explore');
   const [connected, setConnected] = useState(false);
@@ -95,6 +112,8 @@ export default function BuddyAgent({
   const containerRef = useRef<HTMLDivElement>(null);
   const orbRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const onNavigateRef = useRef(onNavigate);
+  onNavigateRef.current = onNavigate;
 
   // Initialize position after mount
   useEffect(() => {
@@ -282,6 +301,35 @@ export default function BuddyAgent({
 
     client.onOutputTranscript = (text, finished) => {
       addMessage(text, 'assistant', 'append', finished);
+
+      // After the turn is finished, scan the last assistant message for [NAV:x:y]
+      // and spawn a nav-card message
+      if (finished) {
+        setMessages(prev => {
+          // Find the last assistant message
+          for (let i = prev.length - 1; i >= 0; i--) {
+            if (prev[i].type === 'assistant') {
+              const nav = parseNavMarker(prev[i].text);
+              if (nav) {
+                const updated = [...prev];
+                // Clean the marker out of the assistant text
+                updated[i] = { ...updated[i], text: nav.cleanText };
+                // Append a nav-card message
+                updated.push({
+                  text: '',
+                  type: 'nav-card',
+                  isFinished: true,
+                  navRoomIndex: nav.roomIndex,
+                  navObjectIndex: nav.objectIndex,
+                });
+                return updated;
+              }
+              break;
+            }
+          }
+          return prev;
+        });
+      }
     };
 
     client.onTurnComplete = () => {
@@ -487,6 +535,72 @@ export default function BuddyAgent({
                   </div>
                 );
               }
+              // Render nav-card as a dedicated yes/no UI
+              if (msg.type === 'nav-card' && msg.navRoomIndex != null && msg.navObjectIndex != null) {
+                const targetRoom = rooms?.[msg.navRoomIndex];
+                const targetObj = targetRoom?.objects[msg.navObjectIndex];
+                const roomLabel = targetRoom?.roomKey.replace(/_/g, ' ') ?? `Room ${msg.navRoomIndex}`;
+                return (
+                  <div key={i} className="flex justify-start">
+                    <div
+                      className="max-w-[90%] rounded-2xl overflow-hidden text-xs"
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(99,102,241,0.25)',
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.3), rgba(99,102,241,0.3))' }}
+                        >
+                          <MapPin className="w-4 h-4 text-emerald-300" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-white/90 font-semibold leading-tight capitalize">{roomLabel}</p>
+                          {targetObj && (
+                            <p className="text-indigo-300/70 leading-tight mt-0.5 truncate">{targetObj.label}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex border-t border-white/10">
+                        <button
+                          onClick={() => {
+                            // Dismiss: replace this nav-card with a system message
+                            setMessages(prev => prev.map((m, idx) =>
+                              idx === i ? { text: 'Navigation dismissed', type: 'system' as MessageType, isFinished: true } : m
+                            ));
+                          }}
+                          className="flex-1 py-2 text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors font-medium"
+                        >
+                          Dismiss
+                        </button>
+                        <div className="w-px bg-white/10" />
+                        <button
+                          onClick={() => {
+                            const navFn = onNavigateRef.current;
+                            const ri = msg.navRoomIndex;
+                            const oi = msg.navObjectIndex;
+                            console.log('[NAV-CARD] Move clicked:', { ri, oi, hasNavFn: !!navFn });
+                            if (navFn && ri != null && oi != null) {
+                              navFn(ri, oi);
+                            }
+                            // Replace nav-card with a confirmation system message
+                            setMessages(prev => prev.map((m, idx) =>
+                              idx === i ? { text: `Moved to ${roomLabel}`, type: 'system' as MessageType, isFinished: true } : m
+                            ));
+                          }}
+                          className="flex-1 py-2 font-semibold transition-colors hover:brightness-110"
+                          style={{ color: '#6ee7b7', background: 'rgba(16,185,129,0.08)' }}
+                        >
+                          Move here
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const isUser = msg.type === 'user' || msg.type === 'user-transcript';
               return (
                 <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>

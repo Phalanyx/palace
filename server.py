@@ -16,6 +16,8 @@ import os
 import google.auth
 from dotenv import load_dotenv
 import traceback
+import urllib.request
+import urllib.error
 from websockets.legacy.server import WebSocketServerProtocol
 from websockets.legacy.protocol import WebSocketCommonProtocol
 from websockets.exceptions import ConnectionClosed
@@ -81,6 +83,68 @@ def handle_moorcheh_tool(tool_name: str, args: dict) -> dict:
         print(f"❌ [MOORCHEH SDK ERROR] {e}")
         return {"error": str(e)}
 
+# NEXT.JS APP URL (for calling API routes like search-rooms)
+NEXTJS_URL = os.environ.get("NEXTJS_URL", "http://localhost:3000")
+
+async def handle_search_rooms(args: dict) -> dict:
+    """Calls the Next.js /api/palaces/[id]/search-rooms endpoint."""
+    palace_id = args.get("palaceId", "")
+    query = args.get("query", "")
+
+    if not palace_id or not query:
+        return {"error": f"Missing palaceId or query. Got palaceId='{palace_id}', query='{query}'"}
+
+    print(f"🔍 [SEARCH ROOMS] Palace: {palace_id} | Query: {query} | URL: {NEXTJS_URL}/api/palaces/{palace_id}/search-rooms")
+
+    url = f"{NEXTJS_URL}/api/palaces/{palace_id}/search-rooms"
+    payload = json.dumps({"query": query}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        # Run the blocking HTTP call in a thread so we don't block the event loop
+        def _fetch():
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        result = await loop.run_in_executor(None, _fetch)
+        print(f"🔍 [SEARCH ROOMS] Result: {result}")
+        return result
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        print(f"❌ [SEARCH ROOMS HTTP ERROR] {e.code}: {body}")
+        return {"error": f"HTTP {e.code}: {body}"}
+    except Exception as e:
+        print(f"❌ [SEARCH ROOMS ERROR] {e}")
+        return {"error": str(e)}
+
+
+SEARCH_ROOMS_TOOL = {
+    "name": "searchRooms",
+    "description": "Search across all rooms in the palace to find where a specific topic was discussed. Use this when the user asks something like 'Where did we talk about X?' or 'Which room has Y?'. Returns the best matching room and object with 0-based roomIndex and objectIndex. Use these indices EXACTLY as returned (they are 0-based, do NOT add 1).",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "palaceId": {
+                "type": "STRING",
+                "description": "The palace ID (extract from the namespace in the system prompt, e.g. namespace 'albertPalaceABC123' means palaceId is 'ABC123')."
+            },
+            "query": {
+                "type": "STRING",
+                "description": "The topic or question the user wants to locate in the palace."
+            }
+        },
+        "required": ["palaceId", "query"]
+    }
+}
+
+ALL_TOOLS = [SEARCH_ROOMS_TOOL]
+
 MOORCHEH_TOOLS = [
     {
         "name": "askMoorcheh",
@@ -119,6 +183,8 @@ MOORCHEH_TOOLS = [
         }
     }
 ]
+
+ALL_TOOLS.extend(MOORCHEH_TOOLS)
 
 
 def generate_access_token():
@@ -194,25 +260,25 @@ async def proxy_task(
                     if isinstance(data["setup"]["tools"], list):
                         for t in data["setup"]["tools"]:
                             if "function_declarations" in t:
-                                t["function_declarations"].extend(MOORCHEH_TOOLS)
+                                t["function_declarations"].extend(ALL_TOOLS)
                                 found_funcs = True
                         if not found_funcs:
-                            data["setup"]["tools"].append({"function_declarations": MOORCHEH_TOOLS})
+                            data["setup"]["tools"].append({"function_declarations": ALL_TOOLS})
                     elif isinstance(data["setup"]["tools"], dict):
                         if "function_declarations" not in data["setup"]["tools"]:
                             data["setup"]["tools"]["function_declarations"] = []
-                        data["setup"]["tools"]["function_declarations"].extend(MOORCHEH_TOOLS)
+                        data["setup"]["tools"]["function_declarations"].extend(ALL_TOOLS)
                     
                 # [SERVER -> CLIENT] Intercept tool calls
                 if is_server and "toolCall" in data:
                     function_calls = data["toolCall"].get("functionCalls", [])
                     tool_responses = []
-                    
+
                     for call in function_calls:
                         call_id = call.get("id")
                         name = call.get("name")
                         args = call.get("args", {})
-                        
+
                         if name in ["askMoorcheh", "searchMoorcheh"]:
                             result = handle_moorcheh_tool(name, args)
                             tool_responses.append({
@@ -220,7 +286,14 @@ async def proxy_task(
                                 "name": name,
                                 "response": result
                             })
-                    
+                        elif name == "searchRooms":
+                            result = await handle_search_rooms(args)
+                            tool_responses.append({
+                                "id": call_id,
+                                "name": name,
+                                "response": result
+                            })
+
                     if tool_responses:
                         print(f"🔧 [TOOL RESPONSE] Sending {len(tool_responses)} tool responses back to Gemini")
                         tool_response_msg = {
