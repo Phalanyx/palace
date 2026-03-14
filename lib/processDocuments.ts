@@ -109,7 +109,7 @@ export async function processDocuments(palaceId: string) {
   try {
     const palace = await prisma.palace.findUnique({
       where: { id: palaceId },
-      include: { documents: true }
+      include: { documents: { orderBy: { createdAt: 'asc' } } }
     })
 
     if (!palace) throw new Error("Palace not found")
@@ -152,7 +152,8 @@ export async function processDocuments(palaceId: string) {
       })
 
       const text = transcriptionResult.text || ""
-      combinedTextArray.push(`--- Document: ${doc.fileName} ---\n${text}`)
+      const docIndex = palace.documents.indexOf(doc) + 1
+      combinedTextArray.push(`--- Document ${docIndex} of ${palace.documents.length}: ${doc.fileName} ---\n${text}`)
 
       // Prepare chunks for Moorcheh (approx 2000 chars per chunk)
       const chunkSize = 2000
@@ -187,6 +188,7 @@ export async function processDocuments(palaceId: string) {
       You do NOT need to use all rooms. Choose 2-4 rooms that thematically fit the content.
       Each room MUST contain between 2 and 5 objects. NEVER EXCEED 5 OBJECTS PER ROOM.
       Group related concepts into the same room thematically. Order objects within each room logically.
+      IMPORTANT: Rooms and objects MUST follow the order of the source documents. Concepts from earlier documents should appear in earlier rooms, and within a room, objects should reflect the order they appear in the source material.
 
       ITEM SELECTION — this is the most important creative task:
       For each concept, choose a UNIQUE everyday physical object whose shape or symbolism metaphorically reflects the concept.
