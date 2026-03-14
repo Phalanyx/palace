@@ -36,11 +36,13 @@ const ROOM_LABELS: Record<string, string> = {
   library: '📚 Library',
 };
 
-const ROOM_COMPONENTS: Record<string, React.FC> = {
-  bedroom: Bedroom,
-  great_hall: GreatHall,
-  kitchen: Kitchen,
-  library: LibraryRoom,
+type RoomFC = React.FC<{ objects?: RoomObject[] }>;
+
+const ROOM_COMPONENTS: Record<string, RoomFC> = {
+  bedroom: Bedroom as RoomFC,
+  great_hall: GreatHall as RoomFC,
+  kitchen: Kitchen as RoomFC,
+  library: LibraryRoom as RoomFC,
 };
 
 const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: [number, number, number] }> = {
@@ -112,7 +114,7 @@ export default function PalaceRoomView({ rooms }: { rooms: Room[] }) {
                 gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 1.2 }}
               >
                 <Suspense fallback={null}>
-                  {RoomComponent && <RoomComponent />}
+                  {RoomComponent && <RoomComponent objects={activeRoom?.objects || []} />}
                 </Suspense>
                 <OrbitControls
                   target={cameraConfig?.target || [0, 3, 0]}

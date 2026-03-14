@@ -3,8 +3,17 @@ import React, { useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { mat, matMetal, matCopper, jitter, addMesh, makeTorch, animateFlicker, FlickerItem } from './roomUtils';
+import { DynamicObject } from '../DynamicObject';
 
-export function Kitchen() {
+const KITCHEN_SLOTS: [number, number, number][] = [
+  [0, 2, 2.5],         // On the main prep table
+  [-5.5, 2, 3.5],      // On the side table 
+  [6, 3, 3],           // On top of the barrels
+  [0, 8.5, -7],        // On top of the hearth
+  [-4.5, 2.5, -3]      // Hanging over the cauldron
+];
+
+export function Kitchen({ objects = [] }: { objects?: any[] }) {
   const { group, fl } = useMemo(() => {
     const p = new THREE.Group();
     const fl: FlickerItem[] = [];
@@ -255,6 +264,11 @@ export function Kitchen() {
       <color attach="background" args={[0x1e2a22]} />
       <fogExp2 attach="fog" args={[0x1e2a22, 0.016]} />
       <primitive object={group} />
+
+      {/* Dynamic Objects */}
+      {objects.slice(0, 5).map((obj, i) => (
+        <DynamicObject key={obj.id} objectData={obj} position={KITCHEN_SLOTS[i]} />
+      ))}
     </>
   );
 }

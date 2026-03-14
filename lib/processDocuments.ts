@@ -33,6 +33,20 @@ const palaceSchema = {
             color_hint: { type: Type.STRING, description: "e.g., 'deep blue', 'warm amber'" },
             order_index: { type: Type.INTEGER },
             sample_question: { type: Type.STRING, description: "A test question evaluating the student's semantic understanding of this object's concept." },
+            mesh_parts: {
+              type: Type.ARRAY,
+              description: "Compound 3D mesh definition: an array of primitive parts that compose this object. Each part has its own shape, color, position, and scale. Use NEON/bright colors like #ff00ff, #00ffff, #ffff00.",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  primitive: { type: Type.STRING, enum: ["box", "sphere", "cylinder", "cone", "torus", "icosahedron", "octahedron"] },
+                  color: { type: Type.STRING, description: "Hex color, e.g. '#ff00ff'. Must be a shocking neon color." },
+                  position: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] local offset from group center" },
+                  scale: { type: Type.ARRAY, items: { type: Type.NUMBER }, description: "[x, y, z] scale, e.g. [1, 1, 1]" }
+                },
+                required: ["primitive", "color", "position", "scale"]
+              }
+            },
             metadata: {
               type: Type.OBJECT,
               properties: {
@@ -42,7 +56,7 @@ const palaceSchema = {
               }
             }
           },
-          required: ["label", "description", "model_key", "order_index", "sample_question"]
+          required: ["label", "description", "model_key", "order_index", "sample_question", "mesh_parts"]
         }
       }
     },
@@ -136,8 +150,15 @@ export async function processDocuments(palaceId: string) {
       
       Available rooms: bedroom, great_hall, kitchen, library.
       You do NOT need to use all rooms. Choose 2-4 rooms that thematically fit the content.
-      Each room should contain 2-6 objects. Aim for 8-15 objects total across all rooms.
+      Each room MUST contain between 2 and 5 objects. NEVER EXCEED 5 OBJECTS PER ROOM.
       Group related concepts into the same room. Order objects within each room logically.
+      
+      For each object, you must define 'mesh_parts': an array of 1-3 primitive shapes that compose
+      the object. Be creative: a book = flat box; a key = thin cylinder + tiny sphere at top;
+      a flask = cylinder + smaller sphere; a torch = thin cylinder + cone on top.
+      Use SHOCKING NEON COLORS like #ff00ff, #00ffff, #ccff00, #ff6600 so the user can immediately
+      spot them against the dark medieval background. Position parts relative to group center.
+      Each part: { primitive, color, position: [x,y,z], scale: [x,y,z] }
       
       User's learning goal: "${palace.prompt}"
     `
@@ -173,20 +194,42 @@ export async function processDocuments(palaceId: string) {
         })
 
         // Create Objects for this Room
-        const objectsData = roomData.objects.map((obj: any) => ({
-          roomId: room.id,
-          documentId: palace.documents[0]?.id || "dummy",
-          label: obj.label,
-          description: obj.description,
-          modelKey: obj.model_key,
-          colorHint: obj.color_hint,
-          orderIndex: obj.order_index,
-          sampleQuestion: obj.sample_question,
-          metadata: obj.metadata,
-        }))
+        for (let oi = 0; oi < roomData.objects.length; oi++) {
+          const obj = roomData.objects[oi]
 
-        await prisma.object.createMany({ data: objectsData })
-        allLabels.push(...objectsData.map((o: any) => o.label))
+          // Upload mesh_parts definition to Supabase Storage
+          let meshUrl: string | null = null
+          if (obj.mesh_parts && obj.mesh_parts.length > 0) {
+            const meshJson = JSON.stringify({ parts: obj.mesh_parts })
+            const meshPath = `meshes/${palace.id}/${room.id}-${oi}.json`
+            const { error: meshErr } = await supabase.storage
+              .from('palace-models')
+              .upload(meshPath, meshJson, { contentType: 'application/json', upsert: true })
+            if (meshErr) {
+              console.error(`Non-fatal: failed to upload mesh for object ${oi}:`, meshErr)
+            } else {
+              const { data: urlData } = supabase.storage
+                .from('palace-models')
+                .getPublicUrl(meshPath)
+              meshUrl = urlData.publicUrl
+            }
+          }
+
+          const createdObj = await prisma.object.create({
+            data: {
+              roomId: room.id,
+              documentId: palace.documents[0]?.id || "dummy",
+              label: obj.label,
+              description: obj.description,
+              modelKey: obj.model_key,
+              colorHint: obj.color_hint,
+              orderIndex: obj.order_index,
+              sampleQuestion: obj.sample_question,
+              metadata: { ...obj.metadata, meshUrl },
+            }
+          })
+          allLabels.push(createdObj.label)
+        }
       }
 
       // 4. Upload to Moorcheh Namespace

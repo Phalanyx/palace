@@ -2,8 +2,18 @@
 import React, { useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { mat, matMetal, jitter, addMesh, makeTorch, animateFlicker, FlickerItem } from './roomUtils';
+import { DynamicObject } from '../DynamicObject';
 
-export function Bedroom() {
+const BEDROOM_SLOTS: [number, number, number][] = [
+  [-1.5, 3.5, -2],     // On the bed
+  [-3.8, 2.5, -2],     // On the nightstand
+  [5.5, 3.5, 1.5],     // Floating near the armor
+  [-5, 2, 4],          // On the chair
+  [6, 5, -5]           // On the bookshelf
+];
+
+export function Bedroom({ objects = [] }: { objects?: any[] }) {
   const { group, candles, torches } = useMemo(() => {
     const parent = new THREE.Group();
     const candlesList: any[] = [];
@@ -296,6 +306,11 @@ export function Bedroom() {
       <color attach="background" args={[0x2a3a2a]} />
       <fogExp2 attach="fog" args={[0x2a3a2a, 0.015]} />
       <primitive object={group} />
+
+      {/* Dynamic Objects */}
+      {objects.slice(0, 5).map((obj, i) => (
+        <DynamicObject key={obj.id} objectData={obj} position={BEDROOM_SLOTS[i]} />
+      ))}
     </>
   );
 }

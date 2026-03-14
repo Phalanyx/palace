@@ -2,8 +2,18 @@
 import React, { useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { mat, matMetal, jitter, addMesh, makeTorch, animateFlicker, FlickerItem } from './roomUtils';
+import { DynamicObject } from '../DynamicObject';
 
-export function GreatHall() {
+const GREAT_HALL_SLOTS: [number, number, number][] = [
+  [0, 5, -8],          // On the throne
+  [-3, 2.5, 3],        // On the left banquet table
+  [3, 2.5, 3],         // On the right banquet table
+  [-7, 5, -2],         // On the left balcony
+  [7, 5, -2]           // On the right balcony
+];
+
+export function GreatHall({ objects = [] }: { objects?: any[] }) {
   const { group, flickerLights } = useMemo(() => {
     const parent = new THREE.Group();
     const fl: any[] = [];
@@ -524,6 +534,11 @@ export function GreatHall() {
       <color attach="background" args={[0x0a0e18]} />
       <fogExp2 attach="fog" args={[0x1e2e1e, 0.008]} />
       <primitive object={group} />
+
+      {/* Dynamic Objects */}
+      {objects.slice(0, 5).map((obj, i) => (
+        <DynamicObject key={obj.id} objectData={obj} position={GREAT_HALL_SLOTS[i]} />
+      ))}
     </>
   );
 }

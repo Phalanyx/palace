@@ -3,8 +3,17 @@ import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { mat, matMetal, glow, jitter, addMesh, makeTorch, animateFlicker, FlickerItem } from './roomUtils';
+import { DynamicObject } from '../DynamicObject';
 
-export function Library() {
+const LIBRARY_SLOTS: [number, number, number][] = [
+  [0, 2.5, 0],         // In the center (near crystal)
+  [-6, 7.5, 2],        // On the left mezzanine
+  [6, 7.5, 2],         // On the right mezzanine
+  [-2.5, 2.5, 4],      // On the left reading desk
+  [2.5, 2.5, 4]        // On the right reading desk
+];
+
+export function Library({ objects = [] }: { objects?: any[] }) {
   const crystalRef = useRef<THREE.Mesh>(null);
   const crystInnerRef = useRef<THREE.Mesh>(null);
 
@@ -264,6 +273,11 @@ export function Library() {
       <color attach="background" args={[0x12101a]} />
       <fogExp2 attach="fog" args={[0x12101a, 0.015]} />
       <primitive object={group} />
+
+      {/* Dynamic Objects */}
+      {objects.slice(0, 5).map((obj, i) => (
+        <DynamicObject key={obj.id} objectData={obj} position={LIBRARY_SLOTS[i]} />
+      ))}
     </>
   );
 }
