@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, ImageIcon, Pencil, Calendar, Home, FolderOpen, BookOpen, LogOut } from "lucide-react"
+import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, Paperclip, Home, FolderOpen, BookOpen, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -221,6 +221,44 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
   const [inputText, setInputText] = useState("")
   const [activeFilter, setActiveFilter] = useState("ALL")
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+
+  async function handleGenerate() {
+    if (!inputText.trim() || isGenerating) return
+    setIsGenerating(true)
+    setGenerateError(null)
+    try {
+      const formData = new FormData()
+      formData.append('prompt', inputText)
+      attachedFiles.forEach(f => formData.append('files', f))
+      const res = await fetch('/api/palaces/generate', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        setGenerateError(err.error ?? 'Something went wrong')
+        return
+      }
+      const data = await res.json()
+      setPalaces(prev => [{
+        id: data.palaceId,
+        title: data.title,
+        prompt: data.prompt,
+        status: 'processing',
+        _count: { rooms: 0 },
+        testSessions: [],
+      }, ...prev])
+      setInputText("")
+      setAttachedFiles([])
+    } catch {
+      setGenerateError('Network error — please try again')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#0d0d10] text-white font-sans">
@@ -274,20 +312,43 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             />
             <div className="flex items-center justify-between px-4 pb-4">
               <div className="flex items-center gap-3">
-                <button className="text-white/50 hover:text-white transition-colors"><ImageIcon className="w-5 h-5" /></button>
-                <button className="text-white/50 hover:text-white transition-colors"><Pencil className="w-5 h-5" /></button>
-                <div className="w-px h-4 bg-white/20" />
-                <button className="text-white/50 hover:text-white transition-colors"><Calendar className="w-5 h-5" /></button>
+                <label className="flex items-center gap-2 text-white/50 hover:text-white transition-colors cursor-pointer">
+                  <Paperclip className="w-4 h-4" />
+                  <span className="text-xs">
+                    {attachedFiles.length > 0
+                      ? `${attachedFiles.length} file${attachedFiles.length > 1 ? 's' : ''} attached`
+                      : 'add an attachment (.pdf, .txt, and .md)'}
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".txt,.pdf,.md"
+                    className="hidden"
+                    onChange={e => setAttachedFiles(e.target.files ? Array.from(e.target.files) : [])}
+                  />
+                </label>
               </div>
               <button
-                onClick={() => inputText.trim() && setShowCreateModal(true)}
-                className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-[#0d0d10] hover:bg-white transition-colors disabled:opacity-30"
-                disabled={!inputText.trim()}
+                onClick={handleGenerate}
+                className="flex items-center gap-2 px-4 h-10 rounded-full bg-white/90 text-[#0d0d10] hover:bg-white transition-colors disabled:opacity-30 font-semibold text-sm"
+                disabled={!inputText.trim() || isGenerating}
               >
-                <ArrowUp className="w-5 h-5" />
+                {isGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Building...
+                  </>
+                ) : (
+                  <ArrowUp className="w-5 h-5" />
+                )}
               </button>
             </div>
           </div>
+
+          {/* Inline error */}
+          {generateError && (
+            <p className="text-red-400 text-sm mb-3 -mt-2">{generateError}</p>
+          )}
 
           {/* Quick action pills */}
           <div className="flex items-center justify-center gap-3">
