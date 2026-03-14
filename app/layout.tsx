@@ -30,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
-      <body className={`${baloo.variable} ${comicNeue.variable} font-sans antialiased text-slate-900 bg-[#EEF2FF]`}>
+      <body className={`${baloo.variable} ${comicNeue.variable} bg-background font-sans text-foreground antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>

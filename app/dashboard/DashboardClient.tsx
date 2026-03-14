@@ -259,19 +259,6 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const hasHandledLandingIntent = useRef(false)
 
-  useEffect(() => {
-    const root = document.documentElement
-    const body = document.body
-
-    root.classList.add("dark")
-    body.classList.add("dark")
-
-    return () => {
-      root.classList.remove("dark")
-      body.classList.remove("dark")
-    }
-  }, [])
-
   async function generatePalace(prompt: string, files: File[] = []) {
     const trimmedPrompt = prompt.trim()
 
@@ -358,7 +345,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
   }, [router, searchParams, user])
 
   return (
-    <div className="dark glass-page min-h-screen font-sans text-foreground">
+    <div className="glass-page min-h-screen font-sans text-foreground">
         <DashboardHeader
           activeNavTab={activeNavTab}
           onNavChange={setActiveNavTab}
