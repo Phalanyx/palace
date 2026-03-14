@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>*{margin:0;padding:0}body{overflow:hidden;background:#1e2a22}canvas{display:block}#info{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:#7a9a7a;font-family:monospace;font-size:13px;opacity:.7;pointer-events:none}</style>
+</head>
+<body>
+<div id="info">drag to orbit · scroll to zoom</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x1e2a22);
+scene.fog=new THREE.FogExp2(0x1e2a22,0.016);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,200);
+const R=new THREE.WebGLRenderer({antialias:true});
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.2;
+document.body.appendChild(R.domElement);
+
+const C={
+stoneL:0x6a7a72,stoneM:0x4a5a52,stoneD:0x3a4a42,wallBase:0x4a5a4a,wallD:0x2a3a2e,
+green1:0x4a6a4a,green2:0x3a5a3a,green3:0x5a7a5a,
+wood:0x4a3a2a,woodD:0x2a1e14,woodL:0x5a4a3a,
+gold:0x7a6a3a,iron:0x2e3034,ironL:0x3e4044,
+bread:0x8a7050,cheese:0xa89040,meat:0x6a3028,carrot:0x9a5020,cabbage:0x4a6a42,
+apple:0x6a2820,pumpkin:0x9a6020,fish:0x6a7a7a,ceramic:0x8a9a8a,
+warm:0x8a7a5a,candle:0xffcc66,skin:0xb89070,skinD:0x9a7050,
+cloth:0x8a9a8a,clothD:0x5a6a5a,apron:0x9aaa9a,
+copper:0x8a5a3a,copperL:0xaa7a4a,sausage:0x6a3a2a,wine:0x3a2a3a,
+clay:0x7a6a5a,basket:0x6a5a3a,rope:0x8a7a5a,garlic:0xcacaaa,red:0x7a3a3a
+};
+
+function mt(c){return new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.85,metalness:.05})}
+function mm(c){return new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.4,metalness:.6})}
+function mc(c){return new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.3,metalness:.5})}
+function J(g,a=.05){const p=g.attributes.position;for(let i=0;i<p.count;i++){p.setX(i,p.getX(i)+(Math.random()-.5)*a);p.setY(i,p.getY(i)+(Math.random()-.5)*a);p.setZ(i,p.getZ(i)+(Math.random()-.5)*a);}p.needsUpdate=true;g.computeVertexNormals();return g;}
+function add(geo,mat,x,y,z,rx,ry,rz,sx,sy,sz,parent){
+const m=new THREE.Mesh(geo,mat);m.position.set(x||0,y||0,z||0);
+if(rx)m.rotation.x=rx;if(ry)m.rotation.y=ry;if(rz)m.rotation.z=rz;
+if(sx||sy||sz)m.scale.set(sx||1,sy||1,sz||1);
+m.castShadow=true;m.receiveShadow=true;(parent||scene).add(m);return m;}
+
+const RW=16,RH=9,RD=14,fl=[];
+
+// Floor
+add(J(new THREE.BoxGeometry(RW,.4,RD,6,1,5),0.05),mt(C.stoneD),0,-.2,0);
+for(let ix=-3;ix<=3;ix++)for(let iz=-3;iz<=3;iz++)
+add(J(new THREE.BoxGeometry(1.8+Math.random()*.3,.05,1.8+Math.random()*.3,2,1,2),.02),mt((ix+iz)%2===0?C.stoneM:C.stoneD),ix*2.1,.03,iz*2.1);
+
+// Walls
+function wb(w,h,d,x,y,z,c){add(J(new THREE.BoxGeometry(w,h,d,Math.max(1,Math.ceil(w/2)),Math.max(1,Math.ceil(h/2)),Math.max(1,Math.ceil(d/2))),.05),mt(c||C.wallBase),x,y,z)}
+wb(RW,RH,.6,0,RH/2,-RD/2);wb(.6,RH,RD,-RW/2,RH/2,0);wb(.6,RH,RD,RW/2,RH/2,0);
+add(new THREE.BoxGeometry(RW,.3,RD),mt(C.wallD),0,RH+.15,0);
+
+// Beams
+for(let z=-5;z<=5;z+=2.5)add(J(new THREE.BoxGeometry(RW-1,.45,.4,5,1,1),.04),mt(C.woodD),0,RH-.2,z);
+for(let x=-5;x<=5;x+=5)add(J(new THREE.BoxGeometry(.35,.4,RD-1,1,1,5),.04),mt(C.woodD),x,RH-.4,0);
+
+// Bricks
+const bCols=[0x4a5a4a,0x5a6a5a,0x3a4a3a,0x6a7a6a,0x4a5a48,0x3a4a3e];
+for(let w=0;w<3;w++)for(let i=0;i<25;i++){
+let bx,by,bz,ry=0;by=.4+Math.random()*(RH-1);
+if(w===0){bx=(Math.random()-.5)*(RW-2);bz=-RD/2+.4;}
+else if(w===1){bz=(Math.random()-.5)*(RD-2);bx=-RW/2+.4;ry=Math.PI/2;}
+else{bz=(Math.random()-.5)*(RD-2);bx=RW/2-.4;ry=Math.PI/2;}
+add(J(new THREE.BoxGeometry(.7+Math.random()*1.5,.25+Math.random()*.5,.15,2,1,1),.02),mt(bCols[i%6]),bx,by,bz,0,ry,0);}
+
+// ====== HEARTH ======
+const hearth=new THREE.Group();
+add(J(new THREE.BoxGeometry(6,6,1.5,3,3,1),.08),mt(C.stoneD),0,3,0,0,0,0,0,0,0,hearth);
+add(new THREE.BoxGeometry(4,3.5,1.6),mt(0x0a0a0a),0,1.75,0,0,0,0,0,0,0,hearth);
+add(J(new THREE.BoxGeometry(3.8,3.3,.3,3,3,1),.04),mt(0x1a1a1a),0,1.8,-.6,0,0,0,0,0,0,hearth);
+add(J(new THREE.BoxGeometry(7,.5,1.8,3,1,1),.05),mt(C.stoneL),0,6.2,0,0,0,0,0,0,0,hearth);
+for(let s=-1;s<=1;s+=2)add(J(new THREE.BoxGeometry(.8,6,.8,1,3,1),.05),mt(C.stoneM),s*2.6,3,.2,0,0,0,0,0,0,hearth);
+add(J(new THREE.BoxGeometry(4,3.5,1.2,2,2,1),.06),mt(C.stoneD),0,7.8,0,0,0,0,0,0,0,hearth);
+add(J(new THREE.BoxGeometry(5,.3,2,3,1,2),.04),mt(C.stoneM),0,.15,.5,0,0,0,0,0,0,hearth);
+for(let i=0;i<4;i++){const l=add(J(new THREE.ConeGeometry(.12,1.5+Math.random()*.5,5),.03),mt(C.woodD),
+(Math.random()-.5)*1,.5+i*.15,(Math.random()-.5)*.3,0,0,Math.PI/2+(Math.random()-.5)*.4,0,0,0,hearth);}
+for(let i=0;i<6;i++)add(new THREE.SphereGeometry(.06+Math.random()*.06,3,3),new THREE.MeshBasicMaterial({color:[0xff4400,0xff6600,0xaa2200][i%3]}),(Math.random()-.5)*1.2,.35,(Math.random()-.5)*.4,0,0,0,0,0,0,hearth);
+for(let i=0;i<5;i++){const f=add(new THREE.ConeGeometry(.1+Math.random()*.12,.6+Math.random()*.5,4),new THREE.MeshBasicMaterial({color:[0xff6622,0xff9933,0xffcc44][i%3]}),(Math.random()-.5)*.8,.8+Math.random()*.3,(Math.random()-.5)*.3,0,0,0,0,0,0,hearth);fl.push({flame:f,idx:i*3});}
+hearth.position.set(0,0,-RD/2+.8);scene.add(hearth);
+// Big visible fire
+const fireG=new THREE.Group();
+for(let i=0;i<8;i++){
+  const h=.8+Math.random()*.8;
+  const r=.12+Math.random()*.15;
+  const f=new THREE.Mesh(new THREE.ConeGeometry(r,h,4),new THREE.MeshBasicMaterial({color:[0xff4400,0xff6622,0xff9933,0xffcc44,0xff5511][i%5],transparent:true,opacity:.85}));
+  f.position.set((Math.random()-.5)*1.2,.3+h/2+Math.random()*.2,(Math.random()-.5)*.5);
+  fireG.add(f);
+  fl.push({flame:f,idx:i*2+60});
+}
+// Extra glow embers at base
+for(let i=0;i<10;i++){
+  const e=new THREE.Mesh(new THREE.SphereGeometry(.04+Math.random()*.08,3,3),new THREE.MeshBasicMaterial({color:[0xff2200,0xff4400,0xff6600,0xaa2200][i%4]}));
+  e.position.set((Math.random()-.5)*1.5,.25+Math.random()*.15,(Math.random()-.5)*.6);
+  fireG.add(e);
+}
+fireG.position.set(0,0,-RD/2+1.2);
+scene.add(fireG);
+// Extra strong fire light
+const fireL2=new THREE.PointLight(0xff4400,3,12);fireL2.position.set(0,1.5,-RD/2+1.5);fireL2.castShadow=true;scene.add(fireL2);
+fl.push({light:fireL2,baseIntensity:3,idx:70});
+const fireL3=new THREE.PointLight(0xffaa22,2,10);fireL3.position.set(0,2.5,-RD/2+2);scene.add(fireL3);
+fl.push({light:fireL3,baseIntensity:2,idx:72});
+const hL=new THREE.PointLight(0xff6622,4,16);hL.position.set(0,3,-RD/2+2);hL.castShadow=true;hL.shadow.mapSize.set(512,512);scene.add(hL);fl.push({light:hL,baseIntensity:4,idx:5});
+
+// Mantel candles+jars
+for(let i=0;i<3;i++){add(new THREE.CylinderGeometry(.04,.04,.2+Math.random()*.2,5),mt(0xcacab0),-1.5+i*.2,6.5,-RD/2+1);
+const f=add(new THREE.SphereGeometry(.03,3,3),new THREE.MeshBasicMaterial({color:C.candle}),-1.5+i*.2,6.7+Math.random()*.1,-RD/2+1,0,0,0,1,1.5,1);fl.push({flame:f,idx:i+30});}
+for(let i=0;i<2;i++){add(J(new THREE.CylinderGeometry(.15,.18,.35,6),.02),mt(C.clay),1.2+i*.5,6.42,-RD/2+1);
+add(new THREE.TorusGeometry(.15,.02,4,6),mt(C.stoneM),1.2+i*.5,6.6,-RD/2+1,Math.PI/2,0,0,0,0,0);}
+
+// ====== SPIT ROAST ======
+const spit=new THREE.Group();
+for(let s=-1;s<=1;s+=2){add(J(new THREE.BoxGeometry(.12,2.2,.12,1,3,1),.02),mm(C.iron),s*1.2,1.1,0,0,0,0,0,0,0,spit);add(new THREE.BoxGeometry(.06,.3,.06),mm(C.iron),s*1.2,2.3,0,0,0,0,0,0,0,spit);}
+add(new THREE.CylinderGeometry(.04,.04,2.6,5),mm(C.iron),0,2.1,0,0,0,Math.PI/2,0,0,0,spit);
+add(J(new THREE.SphereGeometry(.4,5,4),.06),mt(C.meat),0,2.1,0,0,0,0,1.8,.8,.8,spit);
+spit.position.set(0,0,-RD/2+1.8);scene.add(spit);
+
+// ====== TRIPOD+CAULDRON ======
+const trip=new THREE.Group();
+for(let i=0;i<3;i++){const a=(i/3)*Math.PI*2;const l=add(J(new THREE.CylinderGeometry(.04,.06,2.5,5),.02),mm(C.iron),Math.cos(a)*.5,1.15,Math.sin(a)*.5,Math.sin(a)*.15,0,-Math.cos(a)*.15,0,0,0,trip);}
+add(new THREE.TorusGeometry(.35,.03,4,6),mm(C.iron),0,2.2,0,Math.PI/2,0,0,0,0,0,trip);
+for(let c=0;c<4;c++)add(new THREE.TorusGeometry(.05,.015,4,4),mm(C.iron),0,1.8-c*.2,0,c%2===0?0:Math.PI/2,0,0,0,0,0,trip);
+add(J(new THREE.SphereGeometry(.5,6,5,0,Math.PI*2,0,Math.PI*.7),.04),mm(C.iron),0,1,0,0,0,0,0,0,0,trip);
+add(new THREE.TorusGeometry(.48,.04,4,7),mm(C.ironL),0,1.25,0,Math.PI/2,0,0,0,0,0,trip);
+add(new THREE.TorusGeometry(.35,.025,4,6,Math.PI),mm(C.iron),0,1.6,0,0,0,0,0,0,0,trip);
+add(new THREE.CircleGeometry(.44,6),mt(0x4a4a2a),0,1.2,0,-Math.PI/2,0,0,0,0,0,trip);
+trip.position.set(-4.5,0,-3);scene.add(trip);
+for(let i=0;i<3;i++){const f=add(new THREE.ConeGeometry(.06+Math.random()*.06,.3+Math.random()*.2,4),new THREE.MeshBasicMaterial({color:[0xff6622,0xff9933][i%2]}),-4.5+(Math.random()-.5)*.4,.15,-3+(Math.random()-.5)*.3);fl.push({flame:f,idx:i*5+10});}
+const tpL=new THREE.PointLight(0xff6622,1.5,7);tpL.position.set(-4.5,1.5,-3);scene.add(tpL);fl.push({light:tpL,baseIntensity:1.5,idx:12});
+
+// ====== STONE OVEN ======
+const oven=new THREE.Group();
+add(J(new THREE.BoxGeometry(3,2.5,2.5,2,2,2),.08),mt(C.stoneM),0,1.25,0,0,0,0,0,0,0,oven);
+add(J(new THREE.SphereGeometry(1.5,5,4,0,Math.PI*2,0,Math.PI/2),.06),mt(C.stoneD),0,2.5,0,0,0,0,0,0,0,oven);
+add(new THREE.BoxGeometry(1.2,1,.3),mt(0x0a0a0a),0,.8,1.2,0,0,0,0,0,0,oven);
+const oG=add(new THREE.SphereGeometry(.3,3,3),new THREE.MeshBasicMaterial({color:0xff4400}),0,.6,.8,0,0,0,1.5,1,1,oven);fl.push({flame:oG,idx:15});
+add(J(new THREE.CylinderGeometry(.25,.3,2,5),.03),mt(C.stoneD),0,3.8,0,0,0,0,0,0,0,oven);
+oven.position.set(RW/2-2,0,-3);scene.add(oven);
+const oL=new THREE.PointLight(0xff4400,1,5);oL.position.set(RW/2-2,1,-1.8);scene.add(oL);fl.push({light:oL,baseIntensity:1,idx:16});
+
+// ====== POT RACK ======
+const rack=new THREE.Group();
+add(new THREE.CylinderGeometry(.05,.05,6,5),mm(C.iron),0,0,0,0,0,Math.PI/2,0,0,0,rack);
+add(new THREE.CylinderGeometry(.04,.04,2.5,5),mm(C.iron),0,0,0,Math.PI/2,0,0,0,0,0,rack);
+for(let s=-1;s<=1;s+=2)for(let c=0;c<5;c++)add(new THREE.TorusGeometry(.05,.015,4,4),mm(C.iron),s*2.2,.3+c*.25,0,c%2===0?0:Math.PI/2,0,0,0,0,0,rack);
+function hangPot(x,y,sz){const pg=new THREE.Group();add(J(new THREE.CylinderGeometry(sz*.8,sz,sz*1.2,6),.03),mm(C.iron),0,0,0,0,0,0,0,0,0,pg);add(new THREE.TorusGeometry(sz*.8,.025,4,6),mm(C.ironL),0,sz*.6,0,Math.PI/2,0,0,0,0,0,pg);add(new THREE.TorusGeometry(sz*.6,.02,4,5,Math.PI),mm(C.iron),0,sz,0,0,0,0,0,0,0,pg);pg.position.set(x,y,0);rack.add(pg);}
+hangPot(-2,-.8,.3);hangPot(-.8,-.7,.25);hangPot(.5,-.9,.35);hangPot(1.8,-.75,.28);
+function hangPan(x,y){const pg=new THREE.Group();add(J(new THREE.CylinderGeometry(.25,.25,.08,6),.02),mc(C.copper),0,0,0,0,0,0,0,0,0,pg);add(new THREE.CylinderGeometry(.03,.03,.35,4),mc(C.copperL),.35,0,0,0,0,Math.PI/2,0,0,0,pg);pg.position.set(x,y,.3);rack.add(pg);}
+hangPan(-1.5,-.5);hangPan(1,-.4);hangPan(2.5,-.6);
+// Ladles
+for(let i=0;i<2;i++){const ld=new THREE.Group();add(new THREE.CylinderGeometry(.015,.015,.7,4),mt(C.wood),0,0,0,0,0,.15,0,0,0,ld);add(new THREE.SphereGeometry(.07,4,3,0,Math.PI*2,0,Math.PI*.6),mm(C.iron),0,-.38,0,0,0,0,0,0,0,ld);ld.position.set(-2.5+i*5.5,-.2,.15);rack.add(ld);}
+rack.position.set(0,RH-1.5,1);scene.add(rack);
+
+// ====== MAIN TABLE ======
+const table=new THREE.Group();
+add(J(new THREE.BoxGeometry(5,.2,2.2,4,1,2),.03),mt(C.wood),0,1.5,0,0,0,0,0,0,0,table);
+for(let x=-1;x<=1;x+=2)for(let z=-1;z<=1;z+=2)add(J(new THREE.BoxGeometry(.18,1.5,.18,1,2,1),.02),mt(C.woodD),x*2.1,.75,z*.85,0,0,0,0,0,0,table);
+for(let z=-1;z<=1;z+=2)add(new THREE.BoxGeometry(4.2,.12,.12),mt(C.woodD),0,.5,z*.85,0,0,0,0,0,0,table);
+table.position.set(0,0,2);scene.add(table);
+const tY=1.62,tZ=2;
+
+// Table items
+add(J(new THREE.BoxGeometry(.8,.06,.5,2,1,1),.01),mt(C.woodL),-1.5,tY,tZ-.2);
+{const kn=new THREE.Group();add(new THREE.BoxGeometry(.4,.02,.06),mm(0x8a8a8a),.15,0,0,0,0,0,0,0,0,kn);add(new THREE.BoxGeometry(.2,.04,.06),mt(C.woodD),-.15,0,0,0,0,0,0,0,0,kn);kn.position.set(-1.3,tY+.04,tZ-.2);kn.rotation.y=.3;scene.add(kn);}
+// Bread
+function mkBread(x,y,z,s){s=s||1;add(J(new THREE.SphereGeometry(.25*s,5,4),.04*s),mt(C.bread),x,y,z,0,0,0,1.3,.7,1);}
+mkBread(-.5,tY+.12,tZ+.3,1);mkBread(-.2,tY+.12,tZ+.5,.8);mkBread(-.7,tY+.12,tZ+.6,.7);
+// Cheese
+add(J(new THREE.CylinderGeometry(.3,.3,.15,7),.02),mt(C.cheese),.5,tY+.08,tZ-.4);
+add(J(new THREE.CylinderGeometry(.15,.15,.14,3),.02),mt(C.cheese),.85,tY+.07,tZ-.3);
+// Carrots
+for(let i=0;i<4;i++){add(J(new THREE.ConeGeometry(.04,.35,5),.01),mt(C.carrot),1.2+i*.12,tY+.06,tZ+.1,0,0,Math.PI/2+(Math.random()-.5)*.3);}
+// Cabbage
+add(J(new THREE.SphereGeometry(.2,5,4),.04),mt(C.cabbage),1.8,tY+.12,tZ+.4,0,0,0,1,.7,1);
+// Mortar+pestle
+add(J(new THREE.CylinderGeometry(.15,.18,.2,6),.02),mt(C.stoneM),-1.8,tY+.1,tZ+.4);
+add(new THREE.CylinderGeometry(.03,.04,.3,5),mt(C.stoneL),-1.8,tY+.25,tZ+.4,0,0,.4);
+// Rolling pin
+add(new THREE.CylinderGeometry(.05,.05,.7,6),mt(C.woodL),.8,tY+.06,tZ-.6,0,0,Math.PI/2);
+// Bowl
+add(J(new THREE.SphereGeometry(.15,5,4,0,Math.PI*2,0,Math.PI*.5),.02),mt(C.woodL),-.5,tY+.01,tZ-.5,Math.PI,0,0);
+// Plates
+add(new THREE.CylinderGeometry(.22,.18,.04,7),mt(C.ceramic),.2,tY+.02,tZ-.5);
+add(new THREE.CylinderGeometry(.22,.18,.04,7),mt(C.ceramic),1.5,tY+.02,tZ-.5);
+// Mugs
+function mkMug(x,y,z){const mg=new THREE.Group();add(J(new THREE.CylinderGeometry(.08,.1,.2,6),.01),mt(C.clay),0,0,0,0,0,0,0,0,0,mg);add(new THREE.TorusGeometry(.06,.015,4,5,Math.PI),mt(C.clay),.09,0,0,0,Math.PI/2,0,0,0,0,mg);mg.position.set(x,y+.1,z);scene.add(mg);}
+mkMug(-2,tY,tZ-.5);mkMug(2.2,tY,tZ+.3);
+
+// ====== PREP COUNTER (left wall) ======
+const counter=new THREE.Group();
+add(J(new THREE.BoxGeometry(1.5,1.6,5,1,2,3),.05),mt(C.wood),0,.8,0,0,0,0,0,0,0,counter);
+add(J(new THREE.BoxGeometry(1.7,.15,5.2,2,1,3),.03),mt(C.stoneM),0,1.65,0,0,0,0,0,0,0,counter);
+counter.position.set(-RW/2+1.2,0,-1.5);scene.add(counter);
+const cX=-RW/2+1.2,cY=1.75,cZ=-1.5;
+for(let i=0;i<4;i++){add(J(new THREE.CylinderGeometry(.12+Math.random()*.05,.15,.3+Math.random()*.15,6),.02),mt(C.clay),cX,cY+.15,cZ-1.5+i*.8);add(new THREE.CylinderGeometry(.14+Math.random()*.04,.14,.04,6),mt(C.woodD),cX,cY+.32+Math.random()*.05,cZ-1.5+i*.8);}
+// Basket
+{const bsk=new THREE.Group();add(J(new THREE.CylinderGeometry(.35,.3,.25,7),.03),mt(C.basket),0,0,0,0,0,0,0,0,0,bsk);for(let i=0;i<4;i++){add(J(new THREE.SphereGeometry(.08+Math.random()*.05,4,3),.02),mt([C.carrot,C.cabbage,C.pumpkin,C.apple][i]),(Math.random()-.5)*.2,.2,(Math.random()-.5)*.2,0,0,0,0,0,0,bsk);}bsk.position.set(cX,cY+.12,cZ+1.5);scene.add(bsk);}
+// Wine bottles
+for(let i=0;i<3;i++){const wb=new THREE.Group();add(J(new THREE.CylinderGeometry(.06,.07,.3,5),.01),mt(C.wine),0,0,0,0,0,0,0,0,0,wb);add(new THREE.CylinderGeometry(.03,.04,.12,5),mt(C.wine),0,.2,0,0,0,0,0,0,0,wb);wb.position.set(cX,cY+.15,cZ+.3+i*.25);scene.add(wb);}
+
+// ====== SIDE TABLE ======
+const sT=new THREE.Group();
+add(J(new THREE.BoxGeometry(3,.15,1.5,3,1,1),.03),mt(C.wood),0,1.3,0,0,0,0,0,0,0,sT);
+for(let x=-1;x<=1;x+=2)add(J(new THREE.BoxGeometry(.15,1.3,1.3,1,2,1),.02),mt(C.woodD),x*1.2,.65,0,0,0,0,0,0,0,sT);
+sT.position.set(-RW/2+2.5,0,3.5);scene.add(sT);
+const stY=1.39,stX=-RW/2+2.5,stZ=3.5;
+for(let i=0;i<5;i++){add(J(new THREE.SphereGeometry(.1,5,4),.02),mt([C.apple,0x4a6a32,C.apple][i%3]),stX-.5+i*.25,stY+.1+(i>2?.1:0),stZ+.3);add(new THREE.CylinderGeometry(.01,.01,.06,3),mt(C.woodD),stX-.5+i*.25,stY+.2+(i>2?.1:0),stZ+.3);}
+function mkPump(x,y,z,s){s=s||1;add(J(new THREE.SphereGeometry(.25*s,6,5),.04*s),mt(C.pumpkin),x,y+.15*s,z,0,0,0,1,.7,1);add(new THREE.CylinderGeometry(.03*s,.04*s,.12*s,4),mt(C.green2),x,y+.28*s,z);}
+mkPump(stX+.8,stY,stZ-.2,1.2);mkPump(stX+1.2,stY,stZ+.2,.8);
+function mkFish(x,y,z){const fg=new THREE.Group();add(J(new THREE.SphereGeometry(.15,5,4),.02),mt(C.fish),0,0,0,0,0,0,2,.6,.8,fg);add(new THREE.ConeGeometry(.1,.2,3),mt(C.fish),.3,0,0,0,0,Math.PI/2,0,0,0,fg);add(new THREE.SphereGeometry(.02,3,3),mt(0x1a1a1a),-.15,.04,.1,0,0,0,0,0,0,fg);fg.position.set(x,y,z);scene.add(fg);}
+mkFish(stX-.5,stY+.08,stZ-.3);mkFish(stX-.2,stY+.08,stZ-.45);
+add(J(new THREE.BoxGeometry(.4,.12,.3,2,1,1),.03),mt(C.meat),stX+.2,stY+.07,stZ-.3);
+
+// ====== BARREL TABLE ======
+{const bg=new THREE.Group();add(J(new THREE.CylinderGeometry(.55,.5,1.4,7,3),.04),mt(C.wood),0,.7,0,0,0,0,0,0,0,bg);for(let b=0;b<3;b++)add(new THREE.TorusGeometry(.53,.025,4,7),mm(C.iron),0,.2+b*.5,0,Math.PI/2,0,0,0,0,0,bg);add(J(new THREE.CylinderGeometry(.6,.6,.06,7),.02),mt(C.woodL),0,1.42,0,0,0,0,0,0,0,bg);bg.position.set(RW/2-2,0,3);scene.add(bg);}
+mkMug(RW/2-2.2,1.45,3.2);mkMug(RW/2-1.7,1.45,2.7);
+mkBread(RW/2-2,1.58,3,.9);
+
+// ====== STOOLS ======
+function mkStool(x,z){const sg=new THREE.Group();add(J(new THREE.CylinderGeometry(.3,.28,.08,6),.02),mt(C.wood),0,.9,0,0,0,0,0,0,0,sg);for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2;add(new THREE.CylinderGeometry(.04,.05,.85,4),mt(C.woodD),Math.cos(a)*.2,.42,Math.sin(a)*.2,0,0,0,0,0,0,sg);}sg.position.set(x,0,z);scene.add(sg);}
+mkStool(-1.5,3.2);mkStool(1.5,3.2);mkStool(RW/2-2.8,3.5);mkStool(-4,0);
+
+// ====== SHELVES ======
+function mkShelf(x,y,z,w,ry){const sg=new THREE.Group();add(J(new THREE.BoxGeometry(w,.1,.5,Math.ceil(w),1,1),.02),mt(C.wood),0,0,0,0,0,0,0,0,0,sg);for(let s=-1;s<=1;s+=2)add(new THREE.BoxGeometry(.08,.3,.4),mt(C.woodD),s*(w/2-.2),-.2,0,0,0,0,0,0,0,sg);sg.position.set(x,y,z);sg.rotation.y=ry||0;scene.add(sg);}
+mkShelf(-RW/2+.6,3.5,3,3,Math.PI/2);mkShelf(-RW/2+.6,5.5,3,3,Math.PI/2);
+mkShelf(RW/2-.6,3.5,-.5,3,-Math.PI/2);mkShelf(RW/2-.6,5.5,-.5,3,-Math.PI/2);
+mkShelf(-5,4,-RD/2+.6,3,0);mkShelf(5,4,-RD/2+.6,3,0);
+// Shelf items
+for(let i=0;i<5;i++)add(J(new THREE.CylinderGeometry(.08+Math.random()*.04,.1,.25+Math.random()*.1,6),.02),mt([C.clay,C.ceramic,C.stoneM][i%3]),-RW/2+.6,3.7,1.8+i*.55);
+for(let i=0;i<4;i++)add(new THREE.CylinderGeometry(.18,.14,.04,6),mt(C.ceramic),-RW/2+.6,5.6,1.8+i*.7);
+for(let i=0;i<3;i++){const wb=new THREE.Group();add(J(new THREE.CylinderGeometry(.06,.07,.3,5),.01),mt(C.wine),0,0,0,0,0,0,0,0,0,wb);add(new THREE.CylinderGeometry(.03,.04,.12,5),mt(C.wine),0,.2,0,0,0,0,0,0,0,wb);wb.position.set(RW/2-.6,3.7,-1.5+i*.4);scene.add(wb);}
+for(let i=0;i<3;i++)add(J(new THREE.CylinderGeometry(.12,.14,.28,6),.02),mt(C.clay),RW/2-.6,3.7,i*.5);
+for(let i=0;i<3;i++)add(J(new THREE.CylinderGeometry(.2+i*.04,.2+i*.04,.05,6),.01),mc(C.copper),RW/2-.6,5.6,-1.2+i*.7);
+
+// ====== STORAGE ======
+function mkBarrel(x,z,s){s=s||1;const bg=new THREE.Group();add(J(new THREE.CylinderGeometry(.4*s,.35*s,1.2*s,7,3),.03*s),mt(C.wood),0,.6*s,0,0,0,0,0,0,0,bg);for(let b=0;b<3;b++)add(new THREE.TorusGeometry(.38*s,.02*s,4,7),mm(C.iron),0,.2*s+b*.4*s,0,Math.PI/2,0,0,0,0,0,bg);bg.position.set(x,0,z);scene.add(bg);}
+mkBarrel(RW/2-1.2,-5);mkBarrel(RW/2-1.2,-3.8);mkBarrel(RW/2-2.2,-4.5,.85);
+{const sb=new THREE.Group();add(J(new THREE.CylinderGeometry(.35,.3,1,7,3),.03),mt(C.wood),0,0,0,0,0,0,0,0,0,sb);for(let b=0;b<3;b++)add(new THREE.TorusGeometry(.33,.018,4,7),mm(C.iron),0,-.3+b*.35,0,Math.PI/2,0,0,0,0,0,sb);sb.position.set(RW/2-1.5,1.8,-5);sb.rotation.x=.05;scene.add(sb);}
+
+function mkCrate(x,y,z,s){s=s||1;const cg=new THREE.Group();add(J(new THREE.BoxGeometry(.8*s,.7*s,.8*s,2,2,2),.03*s),mt(C.woodD),0,0,0,0,0,0,0,0,0,cg);for(let e=-1;e<=1;e+=2){add(new THREE.BoxGeometry(.82*s,.06*s,.06*s),mt(C.woodL),0,e*.25*s,0,0,0,0,0,0,0,cg);add(new THREE.BoxGeometry(.06*s,.06*s,.82*s),mt(C.woodL),0,e*.25*s,0,0,0,0,0,0,0,cg);}cg.position.set(x,y+.35*s,z);scene.add(cg);}
+mkCrate(RW/2-1.5,0,-2);mkCrate(RW/2-2.3,0,-2.2,.9);mkCrate(RW/2-1.8,.7,-2.1,.8);
+
+function mkSack(x,z,s){s=s||1;const sk=add(J(new THREE.SphereGeometry(.35*s,5,4),.06*s),mt(C.warm),x,.25*s,z,0,0,0,1,.7,1);add(new THREE.CylinderGeometry(.05*s,.1*s,.15*s,4),mt(C.warm),x,.45*s,z);}
+mkSack(RW/2-1.5,5.5);mkSack(RW/2-2,5.8,.8);mkSack(-RW/2+1.5,5.5);mkSack(-RW/2+1,5,.9);mkSack(RW/2-2.8,-1.8,1.1);mkSack(RW/2-3.2,-2.2,.7);
+
+// ====== HANGING ITEMS ======
+function mkHerbs(x,y,z){const hg=new THREE.Group();add(new THREE.CylinderGeometry(.01,.01,.3,3),mt(C.rope),0,.15,0,0,0,0,0,0,0,hg);for(let i=0;i<5;i++){add(J(new THREE.CylinderGeometry(.01,.02,.4+Math.random()*.2,4),.02),mt([C.green1,C.green2,C.green3,0x5a7a4a][i%4]),(Math.random()-.5)*.06,-.15-Math.random()*.1,(Math.random()-.5)*.06,0,0,(Math.random()-.5)*.15,0,0,0,hg);}hg.position.set(x,y,z);scene.add(hg);}
+mkHerbs(-2,RH-.5,2);mkHerbs(-1.2,RH-.5,2);mkHerbs(-.3,RH-.5,2);mkHerbs(.5,RH-.5,2.2);mkHerbs(3,RH-.5,1.8);mkHerbs(4,RH-.5,2);mkHerbs(-3,RH-.5,-.5);
+
+function mkGarlic(x,y,z){const gg=new THREE.Group();add(new THREE.CylinderGeometry(.01,.01,.8,3),mt(C.rope),0,-.1,0,0,0,0,0,0,0,gg);for(let i=0;i<5;i++){add(J(new THREE.SphereGeometry(.07,4,3),.02),mt(C.garlic),0,-.1-i*.15,0,0,0,0,1,.8,1,gg);add(new THREE.CylinderGeometry(.01,.02,.06,3),mt(C.warm),0,-.1-i*.15+.08,0,0,0,0,0,0,0,gg);}gg.position.set(x,y,z);scene.add(gg);}
+mkGarlic(-4,RH-.5,0);mkGarlic(-3.5,RH-.5,.3);mkGarlic(2,RH-.5,-.5);mkGarlic(5,RH-.5,-.3);
+
+function mkSausages(x,y,z){const sg=new THREE.Group();add(new THREE.CylinderGeometry(.01,.01,.15,3),mt(C.rope),0,0,0,0,0,0,0,0,0,sg);for(let i=0;i<3;i++){const a=(i/3)*Math.PI*2;add(J(new THREE.CylinderGeometry(.04,.04,.5,5),.02),mt(C.sausage),Math.cos(a)*.06,-.35,Math.sin(a)*.06,0,0,0,0,0,0,sg);add(new THREE.CylinderGeometry(.01,.01,.15,3),mt(C.rope),Math.cos(a)*.06,-.08,Math.sin(a)*.06,0,0,0,0,0,0,sg);}sg.position.set(x,y,z);scene.add(sg);}
+mkSausages(1,RH-.5,0);mkSausages(3,RH-.5,0);mkSausages(-1,RH-.5,-.3);mkSausages(-5,RH-.5,1);
+
+function mkHangFish(x,y,z){const fg=new THREE.Group();add(new THREE.CylinderGeometry(.01,.01,.2,3),mt(C.rope),0,0,0,0,0,0,0,0,0,fg);add(J(new THREE.SphereGeometry(.12,5,4),.02),mt(C.fish),0,-.25,0,0,0,0,1.8,.5,.6,fg);add(new THREE.ConeGeometry(.08,.15,3),mt(C.fish),.2,-.25,0,0,0,Math.PI/2,0,0,0,fg);fg.position.set(x,y,z);scene.add(fg);}
+mkHangFish(4.5,RH-.5,.5);mkHangFish(-5.5,RH-.5,2.5);mkHangFish(0,RH-.5,-2);
+
+// ====== LANTERNS ======
+function mkLantern(x,y,z){const lg=new THREE.Group();for(let c=0;c<6;c++)add(new THREE.TorusGeometry(.04,.01,4,4),mm(C.iron),0,c*.15,0,c%2===0?0:Math.PI/2,0,0,0,0,0,lg);const fr=new THREE.Group();add(new THREE.BoxGeometry(.4,.06,.4),mm(C.iron),0,-.05,0,0,0,0,0,0,0,fr);add(new THREE.BoxGeometry(.4,.06,.4),mm(C.iron),0,.45,0,0,0,0,0,0,0,fr);for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2;add(new THREE.BoxGeometry(.04,.5,.04),mm(C.iron),Math.cos(a)*.17,.2,Math.sin(a)*.17,0,0,0,0,0,0,fr);add(new THREE.PlaneGeometry(.3,.4),new THREE.MeshBasicMaterial({color:0xffaa33,transparent:true,opacity:.3,side:THREE.DoubleSide}),Math.cos(a+Math.PI/4)*.15,.2,Math.sin(a+Math.PI/4)*.15,0,a+Math.PI/4,0,0,0,0,fr);}add(new THREE.CylinderGeometry(.03,.03,.15,4),mt(0xcacab0),0,.1,0,0,0,0,0,0,0,fr);const f=add(new THREE.SphereGeometry(.03,3,3),new THREE.MeshBasicMaterial({color:C.candle}),0,.22,0,0,0,0,1,1.5,1,fr);fl.push({flame:f,idx:40+x});fr.position.y=-.6;lg.add(fr);lg.position.set(x,y,z);scene.add(lg);const pl=new THREE.PointLight(0xffaa44,1.2,8);pl.position.set(x,y-.4,z);scene.add(pl);fl.push({light:pl,baseIntensity:1.2,idx:42+z});}
+mkLantern(-4,RH-.3,3);mkLantern(4,RH-.3,3);mkLantern(0,RH-.3,-3);
+
+// ====== CANDLE CLUSTERS ======
+function mkCandles(x,y,z,n){n=n||3;for(let i=0;i<n;i++){const h=.15+Math.random()*.2;add(new THREE.CylinderGeometry(.03+Math.random()*.02,.04,h,5),mt(0xcacab0),x+(Math.random()-.5)*.15,y+h/2,z+(Math.random()-.5)*.15);const f=add(new THREE.SphereGeometry(.025,3,3),new THREE.MeshBasicMaterial({color:C.candle}),x+(Math.random()-.5)*.12,y+h+.02,z+(Math.random()-.5)*.12,0,0,0,1,1.5,1);fl.push({flame:f,idx:50+i+x});}}
+mkCandles(0,tY,tZ,2);mkCandles(stX,stY,stZ-.5,2);mkCandles(RW/2-2,1.45,3,2);mkCandles(-RW/2+.8,3.6,3,3);mkCandles(RW/2-.8,3.6,-.5,2);
+
+// ====== CHEF ======
+function makeChef(x,z,ry){const ch=new THREE.Group();
+for(let s=-1;s<=1;s+=2){add(J(new THREE.BoxGeometry(.25,.9,.25,1,2,1),.02),mt(C.clothD),s*.18,.45,0,0,0,0,0,0,0,ch);add(J(new THREE.BoxGeometry(.28,.25,.35),.02),mt(C.woodD),s*.18,.12,.05,0,0,0,0,0,0,ch);}
+add(J(new THREE.BoxGeometry(.7,.9,.45,2,2,1),.03),mt(C.cloth),0,1.35,0,0,0,0,0,0,0,ch);
+add(J(new THREE.BoxGeometry(.55,.75,.08,2,2,1),.02),mt(C.apron),0,1.2,.25,0,0,0,0,0,0,ch);
+add(J(new THREE.SphereGeometry(.28,5,4),.03),mt(C.cloth),0,1.15,.18,0,0,0,1,.8,.7,ch);
+for(let s=-1;s<=1;s+=2){add(J(new THREE.BoxGeometry(.2,.5,.2,1,2,1),.02),mt(C.cloth),s*.5,1.45,0,0,0,0,0,0,0,ch);add(J(new THREE.BoxGeometry(.18,.45,.18,1,2,1),.02),mt(C.skin),s*.5,s===1?1.15:1.05,s===1?.35:.15,s===1?-.8:-.3,0,0,0,0,0,ch);add(new THREE.SphereGeometry(.08,4,3),mt(C.skin),s*.5,s===1?.95:.88,s===1?.55:.25,0,0,0,0,0,0,ch);}
+const sp=new THREE.Group();add(new THREE.CylinderGeometry(.02,.02,.6,4),mt(C.wood),0,0,0,0,0,0,0,0,0,sp);add(new THREE.SphereGeometry(.06,4,3),mt(C.woodL),0,-.33,0,0,0,0,1,.4,1,sp);sp.position.set(.5,.95,.7);sp.rotation.x=-.6;ch.add(sp);
+add(new THREE.CylinderGeometry(.1,.12,.15,5),mt(C.skin),0,1.87,0,0,0,0,0,0,0,ch);
+add(J(new THREE.BoxGeometry(.45,.5,.4,2,2,1),.03),mt(C.skin),0,2.2,0,0,0,0,0,0,0,ch);
+add(J(new THREE.CylinderGeometry(.28,.26,.1,6),.02),mt(0xdddddd),0,2.5,0,0,0,0,0,0,0,ch);
+add(J(new THREE.CylinderGeometry(.22,.27,.45,6,2),.04),mt(0xdddddd),0,2.75,0,0,0,0,0,0,0,ch);
+add(J(new THREE.SphereGeometry(.24,5,4),.04),mt(0xe0e0d8),0,3,0,0,0,0,1,.6,1,ch);
+for(let s=-1;s<=1;s+=2)add(new THREE.SphereGeometry(.035,4,3),mt(0x1a1a1a),s*.1,2.25,.21,0,0,0,0,0,0,ch);
+add(J(new THREE.BoxGeometry(.08,.1,.1),.02),mt(C.skinD),0,2.15,.22,0,0,0,0,0,0,ch);
+add(J(new THREE.BoxGeometry(.25,.06,.06,2,1,1),.01),mt(C.woodD),0,2.08,.22,0,0,0,0,0,0,ch);
+ch.position.set(x,0,z);ch.rotation.y=ry;scene.add(ch);}
+makeChef(-3.8,-2.2,-.3);
+
+function makeHelper(x,z,ry){const h=new THREE.Group();
+for(let s=-1;s<=1;s+=2){add(J(new THREE.BoxGeometry(.22,.85,.22,1,2,1),.02),mt(0x4a4a3a),s*.15,.42,0,0,0,0,0,0,0,h);add(J(new THREE.BoxGeometry(.25,.2,.3),.02),mt(C.woodD),s*.15,.1,.04,0,0,0,0,0,0,h);}
+add(J(new THREE.BoxGeometry(.6,.8,.4,2,2,1),.03),mt(0x6a6a5a),0,1.25,0,0,0,0,0,0,0,h);
+add(J(new THREE.BoxGeometry(.48,.65,.07,2,2,1),.02),mt(C.apron),0,1.1,.22,0,0,0,0,0,0,h);
+for(let s=-1;s<=1;s+=2){add(J(new THREE.BoxGeometry(.18,.45,.18,1,2,1),.02),mt(0x6a6a5a),s*.42,1.35,0,0,0,0,0,0,0,h);add(J(new THREE.BoxGeometry(.16,.4,.16,1,2,1),.02),mt(C.skin),s*.42,1,.25,-.6,0,0,0,0,0,h);add(new THREE.SphereGeometry(.07,4,3),mt(C.skin),s*.42,.82,.4,0,0,0,0,0,0,h);}
+add(new THREE.CylinderGeometry(.09,.1,.12,5),mt(C.skin),0,1.72,0,0,0,0,0,0,0,h);
+add(J(new THREE.BoxGeometry(.4,.45,.35,2,2,1),.03),mt(C.skin),0,2.05,0,0,0,0,0,0,0,h);
+add(J(new THREE.BoxGeometry(.44,.2,.38,2,1,1),.02),mt(C.red),0,2.35,0,0,0,0,0,0,0,h);
+for(let s=-1;s<=1;s+=2)add(new THREE.SphereGeometry(.03,4,3),mt(0x1a1a1a),s*.08,2.1,.19,0,0,0,0,0,0,h);
+add(J(new THREE.BoxGeometry(.07,.08,.08),.01),mt(C.skinD),0,2.02,.19,0,0,0,0,0,0,h);
+h.position.set(x,0,z);h.rotation.y=ry;scene.add(h);}
+makeHelper(.5,1.2,0);
+
+// ====== TORCHES ======
+function mkTorch(x,y,z,ry){const g=new THREE.Group();add(J(new THREE.BoxGeometry(.15,.4,.25,1,2,1),.02),mm(C.iron),0,0,0,0,0,0,0,0,0,g);add(new THREE.CylinderGeometry(.05,.07,.7,5),mt(C.woodD),0,.45,0,0,0,0,0,0,0,g);const f=add(new THREE.SphereGeometry(.12,4,4),new THREE.MeshBasicMaterial({color:0xff9933}),0,.9,0,0,0,0,1,1.6,1,g);g.position.set(x,y,z);g.rotation.y=ry||0;scene.add(g);const tl=new THREE.PointLight(0xff8822,1.5,9);tl.position.set(x,y+1.1,z);tl.castShadow=true;scene.add(tl);fl.push({flame:f,light:tl,baseIntensity:1.5,idx:Math.random()*20});}
+mkTorch(-RW/2+.5,4,-2,Math.PI/2);mkTorch(-RW/2+.5,4,4,Math.PI/2);
+mkTorch(RW/2-.5,4,2,-Math.PI/2);mkTorch(RW/2-.5,4,5,-Math.PI/2);
+mkTorch(0,5,-RD/2+.5,0);mkTorch(-5,5,-RD/2+.5,0);mkTorch(5,5,-RD/2+.5,0);
+mkTorch(RW/2-.5,4,-5,-Math.PI/2);mkTorch(-RW/2+.5,4,-4,Math.PI/2);
+
+// ====== LIGHTING ======
+scene.add(new THREE.AmbientLight(0x3a4a42,.5));
+const f1=new THREE.PointLight(0xffaa55,2.2,20);f1.position.set(0,RH-1,0);scene.add(f1);
+const f2=new THREE.PointLight(0xffaa55,1.5,15);f2.position.set(-4,5,2);scene.add(f2);
+const f3=new THREE.PointLight(0xffaa55,1.5,15);f3.position.set(4,5,2);scene.add(f3);
+const f4=new THREE.PointLight(0xff8844,1,12);f4.position.set(0,3,4);scene.add(f4);
+const cF=new THREE.DirectionalLight(0x4a6a5a,.3);cF.position.set(0,8,10);scene.add(cF);
+
+// ====== ORBIT ======
+let isDrag=false,pX=0,pY=0,theta=0,phi=.55,radius=18;
+const tgt=new THREE.Vector3(0,3.5,0);
+function upCam(){camera.position.x=tgt.x+radius*Math.sin(phi)*Math.sin(theta);camera.position.y=tgt.y+radius*Math.cos(phi);camera.position.z=tgt.z+radius*Math.sin(phi)*Math.cos(theta);camera.lookAt(tgt);}
+upCam();
+R.domElement.addEventListener('pointerdown',e=>{isDrag=true;pX=e.clientX;pY=e.clientY;});
+window.addEventListener('pointerup',()=>isDrag=false);
+window.addEventListener('pointermove',e=>{if(!isDrag)return;theta+=(e.clientX-pX)*.005;phi=Math.max(.15,Math.min(1.4,phi-(e.clientY-pY)*.005));pX=e.clientX;pY=e.clientY;upCam();});
+R.domElement.addEventListener('wheel',e=>{radius=Math.max(6,Math.min(30,radius+e.deltaY*.015));upCam();});
+
+// ====== ANIMATE ======
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
+fl.forEach(f=>{const n=f.idx||0;if(f.light){const b=f.baseIntensity||1;f.light.intensity=b+Math.sin(t*7+n)*b*.18+Math.sin(t*13+n*2)*b*.12;}if(f.flame){f.flame.scale.y=1.5+Math.sin(t*9+n)*.4;f.flame.scale.x=1+Math.sin(t*7+n*3)*.2;}});
+R.render(scene,camera);}
+animate();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();R.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
