@@ -280,16 +280,27 @@ export async function processDocuments(palaceId: string) {
 
       for (const saved of savedObjects) {
         const meshData = allMeshes[saved.dbId];
-        const scriptContent = meshData ? meshData.code : `
-          const geometry = new THREE.BoxGeometry(1, 1, 1);
-          const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff });
-          return new THREE.Mesh(geometry, material);
-        `;
-        const meshPath = `meshes/${palace.id}/${saved.dbId}.js`;
+        const htmlContent = meshData ? meshData.html : `<!DOCTYPE html>
+<html><head><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r158/three.min.js"></script></head>
+<body><script>
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+const geometry = new THREE.BoxGeometry(1, 1, 1);
+const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 2.5, flatShading: true });
+const mainObject = new THREE.Mesh(geometry, material);
+scene.add(mainObject);
+camera.position.z = 3;
+function animate() { requestAnimationFrame(animate); mainObject.rotation.y += 0.01; renderer.render(scene, camera); }
+animate();
+</script></body></html>`;
+        const meshPath = `meshes/${palace.id}/${saved.dbId}.html`;
 
         const { error: meshErr } = await supabase.storage
           .from('palace-models')
-          .upload(meshPath, scriptContent, { contentType: 'application/javascript', upsert: true })
+          .upload(meshPath, htmlContent, { contentType: 'text/html', upsert: true })
 
         if (meshErr) {
           console.error(`  Mesh upload failed for "${saved.label}": ${meshErr.message}`)
