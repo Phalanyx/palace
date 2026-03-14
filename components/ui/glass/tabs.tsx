@@ -16,17 +16,23 @@ export interface TabsListProps extends React.ComponentProps<typeof BaseTabsList>
 export const TabsList = React.forwardRef<
   React.ElementRef<typeof BaseTabsList>,
   TabsListProps
->(({ className, variant = "glass", glow = false, hover = "none", ...props }, ref) => {
+>(({ className, glow = false, hover = "none", ...props }, ref) => {
   return (
     <BaseTabsList
       ref={ref}
-      variant={variant}
       className={cn(
         "relative overflow-hidden",
-        glow && "shadow-lg shadow-purple-500/20",
+        glow && "shadow-purple-500/20",
         hoverEffects({ hover }),
         className
       )}
+      style={{
+        backgroundColor: 'var(--glass-bg)',
+        backdropFilter: 'blur(var(--blur)) saturate(180%)',
+        WebkitBackdropFilter: 'blur(var(--blur)) saturate(180%)',
+        border: '0.5px solid var(--glass-border)',
+        boxShadow: 'var(--glass-shadow)',
+      }}
       {...props}
     />
   )

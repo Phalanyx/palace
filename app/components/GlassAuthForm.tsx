@@ -180,8 +180,7 @@ export default function GlassAuthForm() {
       </div>
 
       <div
-        className="w-full rounded-[2rem] px-6 py-6 text-white shadow-[0_30px_80px_rgba(8,12,30,0.36)] sm:px-8 sm:py-8"
-        style={{ border: "1px solid rgba(255,255,255,0.25)" }}
+        className="glass-panel w-full rounded-[2rem] px-6 py-6 text-white sm:px-8 sm:py-8"
       >
         <Tabs value={mode} onValueChange={handleModeChange} className="w-full gap-6">
           <TabsList

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { Baloo_2, Comic_Neue } from "next/font/google";
+import { Baloo_2, Comic_Neue, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const baloo = Baloo_2({
   subsets: ["latin"],
@@ -25,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body className={`${baloo.variable} ${comicNeue.variable} font-sans antialiased text-slate-900 bg-[#EEF2FF]`}>
         {children}
       </body>

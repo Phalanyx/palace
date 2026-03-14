@@ -71,10 +71,10 @@ function RetentionRing({ pct }: { pct: number }) {
     <div className="relative w-12 h-12 flex-shrink-0">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
         <circle cx="24" cy="24" r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="3.5" />
-        <circle cx="24" cy="24" r={r} fill="none" stroke="#60a5fa" strokeWidth="3.5"
+        <circle cx="24" cy="24" r={r} fill="none" stroke="var(--glass-accent)" strokeWidth="3.5"
           strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">
         {Math.round(pct)}%
       </span>
     </div>
@@ -83,11 +83,11 @@ function RetentionRing({ pct }: { pct: number }) {
 
 function RoomBlocks({ count }: { count: number }) {
   return (
-    <div className="flex items-center gap-2 text-white/40 text-xs font-mono">
+    <div className="glass-text-soft flex items-center gap-2 text-xs font-mono">
       <span>Rooms: {String(count).padStart(2, '0')}</span>
       <div className="flex gap-0.5">
         {[0,1,2,3].map(i => (
-          <div key={i} className={`w-2 h-2 ${i < Math.min(count, 4) ? 'bg-[#60a5fa]' : 'border border-white/10'}`} />
+          <div key={i} className={`h-2 w-2 ${i < Math.min(count, 4) ? 'bg-primary' : 'border border-border'}`} />
         ))}
       </div>
     </div>
@@ -105,21 +105,21 @@ function PalaceCard({ palace }: { palace: Palace }) {
     : 'Low Stability'
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col hover:border-white/20 hover:bg-white/8 transition-all">
+    <div className="glass-panel glass-interactive flex flex-col overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <StatusBadge status={palace.status} />
         <RoomBlocks count={rooms} />
       </div>
       <div className="px-4 pb-4 flex-1 flex flex-col">
-        <h3 className="text-lg font-bold text-white mt-2 mb-1 leading-snug">{palace.title}</h3>
-        <p className="text-white/50 text-sm line-clamp-2 leading-relaxed">{palace.prompt}</p>
-        <div className="border-t border-dashed border-white/10 my-4" />
+        <h3 className="mt-2 mb-1 text-lg leading-snug font-bold text-foreground">{palace.title}</h3>
+        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{palace.prompt}</p>
+        <div className="my-4 border-t border-dashed border-border/80" />
         {isError ? (
           <div className="flex items-center justify-between">
-            <Link href={`/palace/${palace.id}`} className="text-[#60a5fa] text-sm font-mono hover:text-white transition-colors">
+            <Link href={`/palace/${palace.id}`} className="glass-accent text-sm font-mono transition-colors hover:text-foreground">
               Repair Architecture
             </Link>
-            <button className="text-white/20 hover:text-red-400 transition-colors">
+            <button className="glass-text-soft transition-colors hover:text-red-400">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -128,11 +128,11 @@ function PalaceCard({ palace }: { palace: Palace }) {
             <div className="flex items-center gap-3">
               {score !== undefined && <RetentionRing pct={score} />}
               <div>
-                <div className="text-white/30 text-[9px] font-bold tracking-widest uppercase mb-0.5">Retention</div>
-                <div className="text-white/60 text-sm font-medium">Loading...</div>
+                <div className="glass-text-soft mb-0.5 text-[9px] font-bold tracking-widest uppercase">Retention</div>
+                <div className="glass-text-muted text-sm font-medium">Loading...</div>
               </div>
             </div>
-            <Lock className="w-4 h-4 text-white/20" />
+            <Lock className="glass-text-soft h-4 w-4" />
           </div>
         ) : (
           <div className="flex items-center justify-between">
@@ -141,18 +141,18 @@ function PalaceCard({ palace }: { palace: Palace }) {
                 <>
                   <RetentionRing pct={score} />
                   <div>
-                    <div className="text-white/30 text-[9px] font-bold tracking-widest uppercase mb-0.5">Retention</div>
-                    <div className="text-white text-sm font-semibold">{stabilityLabel}</div>
+                    <div className="glass-text-soft mb-0.5 text-[9px] font-bold tracking-widest uppercase">Retention</div>
+                    <div className="text-sm font-semibold text-foreground">{stabilityLabel}</div>
                   </div>
                 </>
               ) : (
                 <div>
-                  <div className="text-white/30 text-[9px] font-bold tracking-widest uppercase mb-0.5">Retention</div>
-                  <div className="text-white/30 text-sm">Not tested yet</div>
+                  <div className="glass-text-soft mb-0.5 text-[9px] font-bold tracking-widest uppercase">Retention</div>
+                  <div className="glass-text-soft text-sm">Not tested yet</div>
                 </div>
               )}
             </div>
-            <Link href={`/palace/${palace.id}`} className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-white/60 hover:bg-white/10 hover:text-white transition-colors">
+            <Link href={`/palace/${palace.id}`} className="glass-pill glass-interactive glass-text-muted flex h-8 w-8 items-center justify-center rounded-full hover:text-foreground">
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -197,24 +197,22 @@ function AvatarMenu({ initials, email }: { initials: string, email: string | nul
           <button
             type="button"
             aria-label="Open profile menu"
-            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d10]"
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           />
         }
       >
         <Avatar size="md" glow>
-          <AvatarFallback>
-            {initials}
-          </AvatarFallback>
+          <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" sideOffset={12} className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel>
-            <p>Profile</p>
-            <p className="truncate">{displayName}</p>
+            <p className="glass-text-soft">Profile</p>
+            <p className="truncate text-foreground">{displayName}</p>
             {email ? (
-              <p className="truncate text-xs">{email}</p>
+              <p className="truncate text-xs text-muted-foreground">{email}</p>
             ) : null}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -286,24 +284,17 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d10] text-white font-sans">
+    <div className="dark glass-page min-h-screen font-sans text-foreground">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 absolute top-0 inset-x-0 z-20">
+      <nav className="glass-panel flex items-center justify-between px-6 py-4 absolute top-0 inset-x-0 z-20">
         <div className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/palace_logo.png" alt="Palace" className="h-20 w-auto" />
         </div>
-        <Tabs value={activeNavTab} onValueChange={setActiveNavTab} className="gap-0">
-          <TabsList
-            hover="lift"
-            className="rounded-full border border-white/20 bg-white/10 p-1 backdrop-blur-sm"
-          >
+        <Tabs value={activeNavTab} onValueChange={setActiveNavTab}>
+          <TabsList>
             {NAV_TABS.map(({ value, label, icon: Icon }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-white/60 data-active:bg-white/20 data-active:text-white data-active:shadow-sm hover:text-white"
-              >
+              <TabsTrigger key={value} value={value}>
                 <Icon data-icon="inline-start" />
                 {label}
               </TabsTrigger>
@@ -316,34 +307,34 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
       {/* Hero with dragon scene background */}
       <div className="relative overflow-hidden" style={{ height: 1050 }}>
         {/* Dragon scene fills the hero */}
-        <div className="absolute inset-0 bg-black">
+        <div className="absolute inset-0 bg-background">
           <DragonSceneLoader />
         </div>
         {/* Vignette on all 4 edges */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 50%, transparent 40%, #0d0d10 100%)' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 50%, transparent 40%, var(--glass-page-bg) 100%)" }} />
         {/* Extra fade at bottom to blend into page */}
-        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#0d0d10] to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-48" style={{ background: "linear-gradient(to top, var(--glass-page-bg), transparent)" }} />
 
         {/* Hero content */}
         <div className="relative z-10 flex flex-col items-center justify-center h-full px-6 pb-8 pt-16">
-          <h1 className="text-6xl font-black text-center text-white mb-3 tracking-tight leading-tight drop-shadow-lg">
+          <h1 className="mb-3 text-center text-6xl leading-tight font-black tracking-tight text-foreground drop-shadow-lg">
             Think it. Explore it.
           </h1>
-          <p className="text-white/70 text-center text-lg mb-10 drop-shadow">
+          <p className="mb-10 text-center text-lg text-muted-foreground drop-shadow">
             Explore freely, iterate fast. Your learning, AI-powered.
           </p>
 
           {/* Input box */}
-          <div className="w-full max-w-2xl bg-white/15 backdrop-blur-2xl border border-white/30 rounded-2xl overflow-hidden shadow-2xl mb-5">
+          <div className="glass-panel-strong mb-5 w-full max-w-2xl overflow-hidden rounded-2xl">
             <textarea
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               placeholder="Describe the palace you want to create..."
-              className="w-full bg-transparent text-white placeholder-white/50 px-5 pt-5 pb-3 text-base resize-none outline-none min-h-[100px]"
+              className="min-h-[100px] w-full resize-none bg-transparent px-5 pt-5 pb-3 text-base text-foreground outline-none placeholder:text-muted-foreground"
             />
             <div className="flex items-center justify-between px-4 pb-4">
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-white/50 hover:text-white transition-colors cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
                   <Paperclip className="w-4 h-4" />
                   <span className="text-xs">
                     {attachedFiles.length > 0
@@ -361,7 +352,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
               </div>
               <button
                 onClick={handleGenerate}
-                className="flex items-center gap-2 px-4 h-10 rounded-full bg-white/90 text-[#0d0d10] hover:bg-white transition-colors disabled:opacity-30 font-semibold text-sm"
+                className="flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-30"
                 disabled={!inputText.trim() || isGenerating}
               >
                 {isGenerating ? (
@@ -384,7 +375,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
           {/* Quick action pills */}
           <div className="flex items-center justify-center gap-3">
             {["Recreate Screenshot", "Import from Site", "Explore Effects"].map(label => (
-              <button key={label} className="px-4 py-2 rounded-full border border-white/30 bg-white/20 backdrop-blur text-sm text-white hover:bg-white/30 transition-colors">
+              <button key={label} className="glass-pill glass-interactive rounded-full px-4 py-2 text-sm text-foreground">
                 {label}
               </button>
             ))}
@@ -394,9 +385,9 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
 
       {/* Recent Palaces */}
       <div className="max-w-7xl mx-auto px-6 mb-16 pt-10">
-        <h2 className="text-2xl font-bold text-white mb-6">Recent Palaces</h2>
+        <h2 className="mb-6 text-2xl font-bold text-foreground">Recent Palaces</h2>
         {palaces.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl text-white/30">
+          <div className="glass-panel text-center rounded-2xl border-dashed py-16 text-muted-foreground">
             No palaces yet — describe one above to get started.
           </div>
         ) : (
@@ -409,10 +400,10 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
       {/* Discover Prompts */}
       <div className="max-w-7xl mx-auto px-6 pb-20">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-black text-white tracking-widest uppercase">Discover Palace Prompts</h2>
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 w-64">
-            <Search className="w-4 h-4 text-white/30" />
-            <input placeholder="Search prompts..." className="bg-transparent text-sm text-white placeholder-white/30 outline-none flex-1" />
+          <h2 className="text-2xl font-black tracking-widest uppercase text-foreground">Discover Palace Prompts</h2>
+          <div className="glass-pill flex w-64 items-center gap-2 rounded-full px-4 py-2">
+            <Search className="glass-text-soft h-4 w-4" />
+            <input placeholder="Search prompts..." className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
           </div>
         </div>
 
@@ -421,7 +412,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
-              className={`px-4 py-2 rounded-full text-sm font-bold tracking-wider transition-colors ${activeFilter === tab ? 'bg-white text-[#0d0d10]' : 'border border-white/10 text-white/50 hover:text-white hover:border-white/30'}`}
+              className={`rounded-full px-4 py-2 text-sm font-bold tracking-wider transition-colors ${activeFilter === tab ? 'bg-background text-foreground shadow-sm' : 'glass-pill glass-interactive text-muted-foreground hover:text-foreground'}`}
             >
               {tab}
             </button>
@@ -430,17 +421,17 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {PROMPTS.map(p => (
-            <div key={p.title} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 hover:bg-white/8 transition-all group">
+            <div key={p.title} className="glass-panel glass-interactive group overflow-hidden rounded-2xl">
               <div className="relative h-44 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.img} alt={p.title} className="w-full h-full object-cover opacity-50 group-hover:opacity-65 transition-opacity" />
               </div>
               <div className="p-4">
-                <div className="text-white font-black text-sm tracking-wider uppercase mb-1">{p.title}</div>
-                <div className="text-white/40 text-[10px] font-bold tracking-widest uppercase leading-relaxed mb-4">{p.desc}</div>
+                <div className="mb-1 text-sm font-black tracking-wider uppercase text-foreground">{p.title}</div>
+                <div className="glass-text-soft mb-4 text-[10px] leading-relaxed font-bold tracking-widest uppercase">{p.desc}</div>
                 <button
                   onClick={() => { setInputText(`Create a palace inspired by: ${p.title}. ${p.desc}`); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 border border-white/10 rounded-xl text-sm text-white hover:bg-white/15 transition-colors font-medium"
+                  className="glass-pill glass-interactive flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-foreground"
                 >
                   + Use Prompt
                 </button>
@@ -499,35 +490,35 @@ function CreatePalaceModal({ initialPrompt, onClose, onSuccess }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#18181f] border border-white/10 rounded-2xl p-6 shadow-2xl">
-        <h2 className="text-xl font-black text-white mb-5 tracking-wide">Create Palace</h2>
+      <div className="glass-panel-strong relative w-full max-w-lg rounded-2xl p-6">
+        <h2 className="mb-5 text-xl font-black tracking-wide text-foreground">Create Palace</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Title</label>
+            <label className="glass-text-soft mb-1.5 block text-xs font-bold tracking-widest uppercase">Title</label>
             <input
               required value={title} onChange={e => setTitle(e.target.value)}
               placeholder="e.g. History of Rome"
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/25 focus:border-[#60a5fa] outline-none text-sm"
+              className="glass-panel w-full rounded-xl px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Prompt</label>
+            <label className="glass-text-soft mb-1.5 block text-xs font-bold tracking-widest uppercase">Prompt</label>
             <textarea
               required value={prompt} onChange={e => setPrompt(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/25 focus:border-[#60a5fa] outline-none text-sm resize-none h-24"
+              className="glass-panel h-24 w-full resize-none rounded-xl px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-ring"
             />
           </div>
           <div>
-            <label className="text-xs font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Source Documents</label>
-            <label className="flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-6 cursor-pointer hover:border-[#60a5fa] transition-colors text-center bg-white/5">
+            <label className="glass-text-soft mb-1.5 block text-xs font-bold tracking-widest uppercase">Source Documents</label>
+            <label className="glass-panel glass-interactive flex cursor-pointer flex-col items-center justify-center rounded-xl border-dashed p-6 text-center">
               <input required type="file" multiple accept=".txt,.pdf,.pptx" onChange={e => e.target.files && setFiles(Array.from(e.target.files))} className="hidden" />
-              <span className="text-white/40 text-sm">{files.length > 0 ? `${files.length} file(s) selected` : 'Click to upload .txt / .pdf / .pptx'}</span>
+              <span className="glass-text-soft text-sm">{files.length > 0 ? `${files.length} file(s) selected` : 'Click to upload .txt / .pdf / .pptx'}</span>
             </label>
           </div>
           <button
             type="submit"
             disabled={isSubmitting || !title || !prompt || files.length === 0}
-            className="w-full py-3 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-white/10 disabled:text-white/25 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
           >
             {isSubmitting ? <><RotateCw className="w-4 h-4 animate-spin" />Generating...</> : 'Generate Palace'}
           </button>

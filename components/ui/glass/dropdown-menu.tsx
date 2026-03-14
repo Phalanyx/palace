@@ -21,15 +21,22 @@ export interface DropdownMenuContentProps extends React.ComponentProps<typeof Ba
 export const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof BaseDropdownMenuContent>,
   DropdownMenuContentProps
->(({ className, variant = "glass", glow = false, ...props }, ref) => {
+>(({ className, glow = false, ...props }, ref) => {
   return (
     <BaseDropdownMenuContent
       ref={ref}
-      variant={variant}
       className={cn(
-        glow && "shadow-lg shadow-purple-500/30",
+        "ring-0",
+        glow && "shadow-purple-500/30",
         className
       )}
+      style={{
+        backgroundColor: 'var(--glass-bg)',
+        backdropFilter: 'blur(var(--blur)) saturate(180%)',
+        WebkitBackdropFilter: 'blur(var(--blur)) saturate(180%)',
+        border: '0.5px solid var(--glass-border)',
+        boxShadow: 'var(--glass-shadow)',
+      }}
       {...props}
     />
   )
@@ -43,4 +50,3 @@ export {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 }
-
