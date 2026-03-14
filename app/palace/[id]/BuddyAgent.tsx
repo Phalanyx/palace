@@ -70,6 +70,9 @@ export default function BuddyAgent({
   const playerRef = useRef<AudioPlayer | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const prevContextRef = useRef<string>('');
+  const prevRoomKeyRef = useRef<string | undefined>('');
+  const prevModeRef = useRef<string>('');
+  const prevTestModeRef = useRef<boolean>(false);
   const isDraggingRef = useRef(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const pointerDownPosRef = useRef({ x: 0, y: 0 });
@@ -173,40 +176,58 @@ export default function BuddyAgent({
   }), [palace, currentRoom, selectedObject, openObjects, isTestMode, currentTestQuestion, buddyMode]);
 
   // Auto-update system prompt when context changes.
-  // For room/mode changes: full reconnect (system prompt is baked into setup).
-  // For popup open/close changes (openObjects): inject a context message instead of reconnecting.
+  // We ONLY reconnect for major MODE changes (explore/quiz/test)
+  // or if the socket was fundamentally lost.
   useEffect(() => {
     if (!connected || !clientRef.current) return;
-    const prompt = buildSystemPrompt(buildContext());
-    if (prompt === prevContextRef.current) return;
-    prevContextRef.current = prompt;
-    clientRef.current.updateSystemPrompt(prompt);
-    setStatusText('Context updated — reconnecting...');
-    setConnected(false);
-    setMicActive(false);
-    streamerRef.current?.stop();
-  }, [currentRoom, isTestMode, currentTestQuestion, buddyMode, connected, buildContext]);
+    
+    const mode = buddyMode;
+    const testMode = isTestMode;
+    
+    if (mode !== prevModeRef.current || testMode !== prevTestModeRef.current) {
+      const prompt = buildSystemPrompt(buildContext());
+      prevModeRef.current = mode;
+      prevTestModeRef.current = testMode;
+      prevContextRef.current = prompt;
+      
+      clientRef.current.updateSystemPrompt(prompt);
+      setStatusText('Updating Mode...');
+      setConnected(false);
+      setMicActive(false);
+      streamerRef.current?.stop();
+    }
+  }, [isTestMode, buddyMode, connected, buildContext]);
 
-  // When open popups change, silently update the stored prompt (no reconnect).
-  // Also send a brief context message so the AI knows without reconnecting.
+  // Silent context updates (Room changes, selection changes, popups)
+  // These do NOT reboot the WebSocket, they just send a system message hint.
   useEffect(() => {
     if (!connected || !clientRef.current) return;
+    
     const prompt = buildSystemPrompt(buildContext());
     if (prompt === prevContextRef.current) return;
-    prevContextRef.current = prompt;
-    // Store updated prompt for next reconnect; send a context hint this session
-    if (openObjects.length > 0) {
+    
+    const roomKey = currentRoom?.roomKey;
+    const roomChanged = roomKey !== prevRoomKeyRef.current;
+    
+    if (roomChanged) {
+      prevRoomKeyRef.current = roomKey;
+      clientRef.current.sendText(
+        `[System: User has entered the room: "${roomKey?.replace(/_/g, ' ')}". ` +
+        `Current topics available in this room: ${currentRoom?.objects.map(o => o.label).join(', ')}. ` +
+        `Please greet them warmly and ask what they'd like to explore in this new area.]`
+      );
+    } else if (selectedObject) {
+      clientRef.current.sendText(`[System: User is now focusing on "${selectedObject.label}". Please strictly answer questions related to this topic.]`);
+    } else if (openObjects.length > 0) {
       clientRef.current.sendText(
         `[System context update: The user currently has these popups open — ` +
-        openObjects.map(o => {
-          const visualName = (o as any).metadata?.itemType;
-          const alias = visualName && visualName !== o.label ? ` (also called "${visualName}" in the UI)` : '';
-          return `"${o.label}"${alias}: ${o.description}`;
-        }).join('; ') +
-        '. If the user refers to any of these by their visual name or label, you know exactly what they mean.]'
+        openObjects.map(o => `"${o.label}": ${o.description}`).join('; ') +
+        '.]'
       );
     }
-  }, [openObjects, connected, buildContext]);
+    
+    prevContextRef.current = prompt;
+  }, [currentRoom?.roomKey, selectedObject, openObjects, currentTestQuestion, connected, buildContext]);
 
   function handleConnect() {
     setError(null);

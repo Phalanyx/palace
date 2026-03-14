@@ -146,7 +146,16 @@ export default function PalaceRoomView({
   // Reset open objects when room changes
   useEffect(() => { setOpenObjectIds(new Set()); }, [activeRoomIdx]);
 
-  const handleObjectOpen = (id: string) => setOpenObjectIds(prev => new Set(prev).add(id));
+  const handleObjectOpen = (id: string) => {
+    // Only one object description open at a time
+    setOpenObjectIds(new Set([id]));
+
+    // Also update the active index if this ID belongs to an object in the current room
+    const objIdx = objects.findIndex(o => o.id === id);
+    if (objIdx !== -1) {
+      setActiveObjectIdx(objIdx);
+    }
+  };
   const handleObjectClose = (id: string) => setOpenObjectIds(prev => { const s = new Set(prev); s.delete(id); return s; });
 
   // Derive the currently-open objects with full data for BuddyAgent context
