@@ -48,29 +48,23 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
   useEffect(() => {
     // Prefer the proper Mesh DB relation, fall back to legacy metadata
     let meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
-    
-    // Convert old .json URLs to .js for backwards/forwards compatibility transition if dealing with newly generated ones
-    if (meshUrl?.endsWith('.json')) {
-         meshUrl = meshUrl.slice(0, -5) + '.js'; 
-    }
 
     const buildMeshFromCode = (code: string) => {
       try {
         const createMeshFn = new Function('THREE', code);
         const obj = createMeshFn(THREE);
-        
-        // Attempt to extract an expressive color
-        let foundColor = '#ff00ff'; // default neon
+        if (!obj) throw new Error("No object returned.");
+
+        let foundColor = '#ff00ff';
         obj.traverse((child: any) => {
-          if (child.isMesh && child.material && child.material.color) {
+          if (child.isMesh && child.material?.color) {
             foundColor = '#' + child.material.color.getHexString();
           }
         });
         setAccentColor(foundColor);
         setGeneratedObject(obj);
       } catch (e) {
-        console.error("Failed to build mesh from code:", e);
-        // Fallback
+        console.error("Failed to build mesh:", e);
         const fallbackFn = new Function('THREE', FALLBACK_CODE);
         setGeneratedObject(fallbackFn(THREE));
       }
@@ -83,21 +77,13 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
 
     fetch(meshUrl)
       .then(r => {
-          if (!r.ok) throw new Error("Could not fetch mesh JS code");
-          return r.text();
+        if (!r.ok) throw new Error("Could not fetch mesh");
+        return r.text();
       })
-      .then(text => {
-          // If we accidentally get old JSON with 'parts', try fallback
-          if (text.trim().startsWith('{')) {
-              console.warn("Got legacy JSON instead of JS code, applying fallback");
-              buildMeshFromCode(FALLBACK_CODE);
-          } else {
-              buildMeshFromCode(text);
-          }
-      })
-      .catch((e) => {
-          console.error(e);
-          buildMeshFromCode(FALLBACK_CODE);
+      .then(text => buildMeshFromCode(text))
+      .catch(e => {
+        console.error(e);
+        buildMeshFromCode(FALLBACK_CODE);
       });
   }, [objectData.mesh?.storageUrl, objectData.metadata?.meshUrl]);
 
@@ -134,8 +120,8 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
     >
       <primitive object={generatedObject} castShadow scale={[0.6, 0.6, 0.6]} />
 
-      {/* Point light so it glows into the room */}
-      <pointLight color={accentColor} intensity={20} distance={4} />
+      {/* Subtle glow — keep dim so it doesn't overpower room lighting */}
+      <pointLight color={accentColor} intensity={3} distance={3} />
 
       {/* Click popup */}
       {isOpen && (

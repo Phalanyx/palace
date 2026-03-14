@@ -15,6 +15,7 @@ interface Palace {
   title: string
   prompt: string
   status: string
+  coverImageUrl?: string | null
   _count?: { rooms: number }
   testSessions?: { scorePct: number | null }[]
 }
@@ -73,7 +74,7 @@ function RoomBlocks({ count }: { count: number }) {
 }
 
 function PalaceCard({ palace }: { palace: Palace }) {
-  const score = palace.testSessions?.[0]?.scorePct
+  const score = palace.testSessions?.[0]?.scorePct ?? undefined
   const rooms = palace._count?.rooms ?? 0
   const isError = palace.status === 'error'
   const isProcessing = palace.status === 'processing'
@@ -300,6 +301,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
         title: data.title,
         prompt: data.prompt,
         status: 'processing',
+        coverImageUrl: null,
         _count: { rooms: 0 },
         testSessions: [],
       }, ...prev])
@@ -415,10 +417,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
                 disabled={!inputText.trim() || isGenerating}
               >
                 {isGenerating ? (
-                  <>
-                    <RotateCw className="w-4 h-4 animate-spin" />
-                    Building...
-                  </>
+                  <RotateCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <ArrowUp className="w-5 h-5" />
                 )}
@@ -485,7 +484,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 mb-8 flex-wrap">
           {FILTER_TABS.map(tab => (
             <button
               key={tab}

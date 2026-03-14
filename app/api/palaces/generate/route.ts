@@ -1,7 +1,38 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenAI, Type } from '@google/genai'
+import { Type } from '@google/genai'
+import { ai } from '@/lib/gemini'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' })
+// Extract plain text from a File object (txt, md, pdf placeholder)
+async function extractFileText(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer())
+  // For plain text / markdown, just decode
+  if (file.type === 'text/plain' || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
+    return buffer.toString('utf-8').slice(0, 8000) // cap per-file to avoid huge prompts
+  }
+  // For PDFs and other binary types, ask Gemini to transcribe inline
+  if (file.type === 'application/pdf' || file.name.endsWith('.pdf') || file.name.endsWith('.pptx')) {
+    const base64 = buffer.toString('base64')
+    const mimeType = file.name.endsWith('.pptx')
+      ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      : 'application/pdf'
+    try {
+      const res = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: 'Extract all the text from this document. Output only raw text, no formatting.' },
+            { inlineData: { data: base64, mimeType } }
+          ]
+        }]
+      })
+      return (res.text ?? '').slice(0, 8000)
+    } catch {
+      return '' // If extraction fails, skip this file
+    }
+  }
+  return ''
+}
 
 export async function POST(request: Request) {
   try {
@@ -13,10 +44,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing prompt' }, { status: 400 })
     }
 
-    // Always generate a title + refined learning goal from the prompt
+    // If files are attached, extract their text first so the LLM can use real context
+    let fileContext = ''
+    if (uploadedFiles.length > 0) {
+      const texts = await Promise.all(uploadedFiles.map(f => extractFileText(f)))
+      const combined = texts.filter(Boolean).join('\n\n---\n\n').slice(0, 20000) // overall cap
+      if (combined) {
+        fileContext = `\n\nSOURCE DOCUMENTS (use these to inform the title and learning goal):\n${combined}`
+      }
+    }
+
+    // Generate a title + refined learning goal, informed by actual file content when available
+    const contextNote = fileContext
+      ? 'The user has also uploaded source documents (excerpts below). Use the actual content to create a specific, accurate title and learning goal.'
+      : 'No files were uploaded, so base everything on the user\'s prompt.'
+
     const result = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `You are a learning architect. A user wants to build a memory palace about: "${prompt}"
+      contents: `You are a learning architect. A user wants to build a memory palace.
+
+User's prompt: "${prompt}"
+
+${contextNote}${fileContext}
 
 Generate structured content to scaffold their palace.`,
       config: {
@@ -26,11 +75,11 @@ Generate structured content to scaffold their palace.`,
           properties: {
             title: {
               type: Type.STRING,
-              description: 'A concise, evocative palace name (max 6 words)',
+              description: 'A concise, evocative palace name based on the actual source material (max 6 words)',
             },
             refinedPrompt: {
               type: Type.STRING,
-              description: 'A clear 1–2 sentence learning goal',
+              description: 'A clear 1–2 sentence learning goal derived from the source content',
             },
             expandedContent: {
               type: Type.STRING,

@@ -80,6 +80,7 @@ export default function BuddyAgent({
   const [buddyMode, setBuddyMode] = useState<'explore' | 'quiz'>('explore');
   const [connected, setConnected] = useState(false);
   const [micActive, setMicActive] = useState(false);
+  const [isBlinking, setIsBlinking] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [textInput, setTextInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -105,6 +106,7 @@ export default function BuddyAgent({
   const prevRoomKeyRef = useRef<string | undefined>('');
   const prevModeRef = useRef<string>('');
   const prevTestModeRef = useRef<boolean>(false);
+  const didConnectRef = useRef<boolean>(false);
   const isDraggingRef = useRef(false);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const pointerDownPosRef = useRef({ x: 0, y: 0 });
@@ -143,6 +145,20 @@ export default function BuddyAgent({
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
     };
+  }, []);
+
+  // Auto-connect on mount
+  useEffect(() => {
+    if (!didConnectRef.current) {
+      didConnectRef.current = true;
+      handleConnect();
+    }
+  }, []);
+
+  // Stop blinking after 10 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => setIsBlinking(false), 10000);
+    return () => clearTimeout(timer);
   }, []);
 
   function handlePointerDown(e: React.PointerEvent) {
@@ -289,6 +305,13 @@ export default function BuddyAgent({
       setConnected(true);
       setStatusText('Connected');
       addMessage('Ready! Ask me anything or start speaking.', 'system');
+      
+      // Auto-start talking: send a system greeting prompt
+      client.sendText(
+        `[System: The user has just entered the palace: "${palace.title}". ` +
+        `Please greet them warmly and introduce yourself as their Study Buddy. ` +
+        `Keep it short and engaging.]`
+      );
     };
 
     client.onAudio = async (base64pcm) => {
@@ -707,7 +730,9 @@ export default function BuddyAgent({
         ref={orbRef}
         onPointerDown={handlePointerDown}
         onClick={handleFloatClick}
-        className="w-14 h-14 rounded-full cursor-grab active:cursor-grabbing relative touch-none"
+        className={`w-14 h-14 rounded-full cursor-grab active:cursor-grabbing relative touch-none transition-all duration-500 ${
+          isBlinking ? 'ring-2 ring-emerald-400 animate-[pulse_1s_infinite]' : ''
+        }`}
         style={{ overflow: 'hidden' }}
       >
         <VoiceOrb state={orbState} inputLevel={inputLevel} outputLevel={outputLevel} />

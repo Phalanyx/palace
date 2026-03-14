@@ -1,11 +1,9 @@
-import { GoogleGenAI, Type } from "@google/genai"
+import { ai } from "./gemini"
 import * as THREE from "three"
 
 export interface GeneratedMesh {
   code: string;
 }
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })
 
 const FALLBACK_CODE = `
   const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -22,31 +20,25 @@ const FALLBACK_CODE = `
 
 function suggestGeometry(itemType: string): string {
   const t = itemType.toLowerCase();
-  
-  if (t.includes('sword') || t.includes('blade') || t.includes('knife') || t.includes('key')) {
-    return 'ExtrudeGeometry (to create a specific silhouette profile) or BoxGeometry (stacked carefully)';
-  }
-  if (t.includes('book') || t.includes('box') || t.includes('chest') || t.includes('block') || t.includes('scale')) {
-    return 'BoxGeometry (multiple boxes scaled and positioned inside a Group)';
-  }
-  if (t.includes('ring') || t.includes('halo') || t.includes('donut') || t.includes('band') || t.includes('magnet')) {
-    return 'TorusGeometry or TubeGeometry with low radial segments (e.g. 4-6)';
-  }
-  if (t.includes('tube') || t.includes('pipe') || t.includes('telescope') || t.includes('pole') || t.includes('pillar') || t.includes('lighthouse') || t.includes('funnel')) {
-    return 'CylinderGeometry with low radial segments (e.g. 5-8)';
-  }
-  if (t.includes('sphere') || t.includes('ball') || t.includes('orb') || t.includes('globe') || t.includes('bubble') || t.includes('sprout')) {
-    return 'IcosahedronGeometry (to get a low poly sphere) or DodecahedronGeometry';
-  }
-  if (t.includes('spike') || t.includes('horn') || t.includes('cone') || t.includes('parachute')) {
-    return 'ConeGeometry or CylinderGeometry (with a top radius of 0) with low radial segments (e.g. 4-6)';
-  }
-  if (t.includes('crystal') || t.includes('gem') || t.includes('diamond')) {
-    return 'OctahedronGeometry or IcosahedronGeometry (detail: 0)';
-  }
-
-  // Default fallback suggestion
-  return 'LatheGeometry, ExtrudeGeometry, or an assembly of primitive geometries';
+  if (/sword|blade|knife|dagger|axe/.test(t)) return "ExtrudeGeometry (use a 2D blade shape path)";
+  if (/book|textbook|notebook/.test(t)) return "BoxGeometry (use multiple flat boxes for cover, spine, pages)";
+  if (/ring|torus|donut|circle/.test(t)) return "TorusGeometry (use low tubularSegments=4, radialSegments=6)";
+  if (/bottle|vase|cup|mug|jar|flask/.test(t)) return "LatheGeometry (define a 2D profile curve)";
+  if (/tree|plant|mushroom/.test(t)) return "ConeGeometry (stacked cones for canopy, CylinderGeometry for trunk, low segments=5)";
+  if (/gem|crystal|diamond/.test(t)) return "OctahedronGeometry or ConeGeometry (use low detail=0)";
+  if (/scroll|roll|paper/.test(t)) return "CylinderGeometry (4 sides, then BoxGeometry for unrolled portion)";
+  if (/arrow|bolt/.test(t)) return "ConeGeometry + CylinderGeometry (tip + shaft, 4 sides each)";
+  if (/key/.test(t)) return "ExtrudeGeometry (use a 2D silhouette of a key shape)";
+  if (/shield|crest/.test(t)) return "ExtrudeGeometry (use a 2D shield shape path)";
+  if (/star/.test(t)) return "ExtrudeGeometry (use a Shape with moveTo/lineTo to define a star silhouette)";
+  if (/brain|heart|organ/.test(t)) return "SphereGeometry (low segments=5, then displace vertices)";
+  if (/hourglass|funnel/.test(t)) return "LatheGeometry (use an hourglass profile)";
+  if (/flame|fire|torch/.test(t)) return "ConeGeometry (3 sides, tapered, stacked for flame layers)";
+  if (/chain/.test(t)) return "TorusGeometry (multiple small tori linked together in a line)";
+  if (/coin|medal|disc/.test(t)) return "CylinderGeometry (height=0.05, radialSegments=8)";
+  if (/spear|lance/.test(t)) return "CylinderGeometry (shaft) + ConeGeometry (tip), both 4 sides";
+  if (/feather|quill/.test(t)) return "ExtrudeGeometry (use a leaf-style 2D outline path)";
+  return "THREE.Group with multiple combined geometries to build the recognizable shape";
 }
 
 async function generateSingleMesh(
@@ -54,37 +46,29 @@ async function generateSingleMesh(
 ): Promise<string> {
   const maxRetries = 3;
   let previousErrors = "";
+  const geometrySuggestion = suggestGeometry(obj.itemType);
 
-  const recommendedGeometry = suggestGeometry(obj.itemType);
+  const basePrompt = `You are a 3D artist building a memory palace — a mnemonic learning tool where physical objects help someone REMEMBER academic concepts. Your job: write raw JavaScript (for Three.js) that returns a THREE.Object3D.
 
-  const basePrompt = `You are an expert 3D mesh designer writing raw, executable JavaScript for Three.js.
-Your task is to generate the inner body of a JavaScript function that returns a \`THREE.Object3D\` (such as a \`THREE.Group\` or \`THREE.Mesh\`) representing the following concept.
+THE CONCEPT TO REMEMBER:
+"${obj.label}" — ${obj.description}
 
-OBJECT TO MODEL:
-Label: ${obj.label}
-Description: ${obj.description}
-Physical METAPHOR / Item Type: ${obj.itemType}
+THE PHYSICAL OBJECT CHOSEN AS A METAPHOR: "${obj.itemType}"
 
-RECOMMENDED GEOMETRY APPROACH:
-${recommendedGeometry}
+RECOMMENDED GEOMETRY: ${geometrySuggestion}
 
-IMPORTANT INSTRUCTIONS FOR THE CODE:
-1. You have access to the global \`THREE\` object. DO NOT import or require Three.js.
-2. Build expressive LOW-POLY shapes. DO NOT just stack primitive boxes and spheres! Choose geometries that perfectly represent the item's silhouette.
-3. CRITICAL: For circular geometries (CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, TubeGeometry, LatheGeometry), you MUST specify extremely low segment counts (e.g., 3, 4, 5, 6, 8 max!) to emphasize distinct flat faces. NEVER use 32, 16, or 24 segments. E.g., \`new THREE.CylinderGeometry(radius, radius, height, 6)\`.
-4. Keep the object roughly contained within a 1.5x1.5x1.5 bounding box around the origin (0, 0, 0).
-5. Apply expressive materials. Use \`THREE.MeshPhysicalMaterial\` with neon colors, high emissive values (\`emissive: new THREE.Color(...)\`, \`emissiveIntensity: 2.5\`), roughness, and metalness, so the objects glow beautifully in a dark scene. Use these colors as HEX (e.g. 0xff00ff). 
-6. CRITICAL: ALWAYS include \`flatShading: true\` in ALL \`THREE.MeshPhysicalMaterial\` options to enforce the low-poly aesthetic.
-7. Create an overarching \`THREE.Group\` to combine multiple meshes if needed, and finally \`return group;\` or \`return mesh;\` at the end of your code snippet.
-8. RETURN ONLY NAKED JAVASCRIPT CODE. DO NOT wrap your response in markdown (\`\`\`javascript) or any other formatting. We run the code exactly as you output it. No explanations.
-
-COLOR RULES — pick from these neons, or mix them contextually:
-  0xff00ff, 0x00ffff, 0xccff00, 0xff6600, 0x00ff88, 0xff0088, 0xaa00ff, 0xffff00
-`;
+THREE.JS RULES (CRITICAL):
+1. \`THREE\` is a global. Do NOT use import/require/export.
+2. Low-poly aesthetic: use low segment counts (3-8) on all circular geometries. Always set \`flatShading: true\` on materials.
+3. Use \`THREE.MeshPhysicalMaterial\` with neon emissive glow (emissiveIntensity 2.0-3.0). Colors: 0xff00ff, 0x00ffff, 0xccff00, 0xff6600, 0x00ff88, 0xff0088, 0xaa00ff, 0xffff00.
+4. Keep the object within a 1.5×1.5×1.5 bounding box centered at origin.
+5. For THREE.Shape: use .moveTo(), .lineTo(), .absarc(), .bezierCurveTo(), .quadraticCurveTo(). Do NOT use .arcTo() or .extractPoints() — they do not exist.
+6. Return ONLY raw JavaScript code — no HTML, no markdown, no comments outside the code. Executed via \`new Function('THREE', code)\`.
+7. The final line must be \`return group;\` or \`return mesh;\`.`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const prompt = previousErrors 
-      ? basePrompt + `\n\nLAST ATTEMPT FAILED WITH THESE ERRORS:\n${previousErrors}\n\nPlease fix the errors and output valid JavaScript.`
+    const prompt = previousErrors
+      ? basePrompt + `\n\nLAST ATTEMPT FAILED:\n${previousErrors}\n\nFix these errors and output valid JavaScript only.`
       : basePrompt;
 
     try {
@@ -94,48 +78,28 @@ COLOR RULES — pick from these neons, or mix them contextually:
       });
 
       let code = response.text || "";
-      // Strip markdown if the LLM ignores instructions
-      if (code.startsWith("```javascript")) {
-        code = code.substring(13);
-        if (code.endsWith("```")) {
-           code = code.substring(0, code.length - 3);
-        }
-      } else if (code.startsWith("```js")) {
-        code = code.substring(5);
-        if (code.endsWith("```")) {
-           code = code.substring(0, code.length - 3);
-        }
-      } else if (code.startsWith("```")) {
-        code = code.substring(3);
-        if (code.endsWith("```")) {
-           code = code.substring(0, code.length - 3);
-        }
-      }
-      code = code.trim();
+      // Strip markdown fences
+      code = code.replace(/^```(?:javascript|js)?\n?/i, '').replace(/\n?```$/i, '').trim();
 
-      // VALIDATION LOOP
+      // VALIDATION: execute in Node.js to catch syntax/runtime errors
       try {
         const createMeshFn = new Function('THREE', code);
         const testObj = createMeshFn(THREE);
-        
         if (!testObj || !(testObj instanceof THREE.Object3D)) {
-            throw new Error("The returned object is not a valid THREE.Object3D.");
+          throw new Error("Returned value is not a THREE.Object3D.");
         }
-
-        console.log(`Successfully generated mesh for "${obj.label}" on attempt ${attempt}`);
-        return code; // Return the working code
+        console.log(`Mesh OK for "${obj.label}" on attempt ${attempt}`);
+        return code;
       } catch (execError: any) {
-        console.warn(`Execution failed for "${obj.label}" on attempt ${attempt}:`, execError.message);
-        previousErrors = execError.message;
-        // Proceed to next loop iteration
+        throw new Error(`Execution error: ${execError.message}`);
       }
-    } catch (apiError: any) {
-      console.warn(`Gemini API failed for "${obj.label}" on attempt ${attempt}:`, apiError.message);
-      // Let it naturally retry or return fallback
+    } catch (err: any) {
+      console.warn(`Attempt ${attempt} failed for "${obj.label}":`, err.message);
+      previousErrors = err.message;
     }
   }
 
-  console.error(`All ${maxRetries} attempts failed for "${obj.label}". Using fallback.`);
+  console.error(`All retries failed for "${obj.label}", using fallback.`);
   return FALLBACK_CODE;
 }
 

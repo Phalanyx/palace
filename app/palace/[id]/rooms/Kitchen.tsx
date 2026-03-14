@@ -72,8 +72,13 @@ export function Kitchen({ objects = [], activeObjectIdx = -1, onCloseObject, onO
       hearth.add(f); fl.push({flame:f,idx:i*2+60});
     }
     hearth.position.set(0,0,-RD/2+.8);p.add(hearth);
-    const hL=new THREE.PointLight(0xff6622, 4, 16);hL.position.set(0,3,-RD/2+2);hL.castShadow=true;p.add(hL);
-    fl.push({light:hL,baseIntensity:4,idx:5});
+    const hL=new THREE.PointLight(0xff6622, 4 * 100, 16);hL.position.set(0,3,-RD/2+2);hL.castShadow=true;p.add(hL);
+    fl.push({light:hL,baseIntensity:4 * 100,idx:5});
+    // Extra fire lights (matching HTML)
+    const fireL2=new THREE.PointLight(0xff4400, 3 * 100, 12);fireL2.position.set(0,1.5,-RD/2+1.5);fireL2.castShadow=true;p.add(fireL2);
+    fl.push({light:fireL2,baseIntensity:3 * 100,idx:70});
+    const fireL3=new THREE.PointLight(0xffaa22, 2 * 100, 10);fireL3.position.set(0,2.5,-RD/2+2);p.add(fireL3);
+    fl.push({light:fireL3,baseIntensity:2 * 100,idx:72});
 
     // SPIT ROAST
     const spit=new THREE.Group();
@@ -89,8 +94,8 @@ export function Kitchen({ objects = [], activeObjectIdx = -1, onCloseObject, onO
     A(jitter(new THREE.SphereGeometry(.5,6,5,0,Math.PI*2,0,Math.PI*.7),.04),matMetal(C.iron),0,1,0,0,0,0,1,1,1,trip);
     A(new THREE.TorusGeometry(.48,.04,4,7),matMetal(C.ironL),0,1.25,0,Math.PI/2,0,0,1,1,1,trip);
     trip.position.set(-4.5,0,-3);p.add(trip);
-    const tpL=new THREE.PointLight(0xff6622, 1.5, 7);tpL.position.set(-4.5,1.5,-3);p.add(tpL);
-    fl.push({light:tpL,baseIntensity:1.5,idx:12});
+    const tpL=new THREE.PointLight(0xff6622, 1.5 * 100, 7);tpL.position.set(-4.5,1.5,-3);p.add(tpL);
+    fl.push({light:tpL,baseIntensity:1.5 * 100,idx:12});
 
     // STONE OVEN
     const oven=new THREE.Group();
@@ -99,8 +104,8 @@ export function Kitchen({ objects = [], activeObjectIdx = -1, onCloseObject, onO
     A(new THREE.BoxGeometry(1.2,1,.3),mat(0x0a0a0a),0,.8,1.2,0,0,0,1,1,1,oven);
     A(jitter(new THREE.CylinderGeometry(.25,.3,2,5),.03),mat(C.stoneD),0,3.8,0,0,0,0,1,1,1,oven);
     oven.position.set(RW/2-2,0,-3);p.add(oven);
-    const oL=new THREE.PointLight(0xff4400, 1, 5);oL.position.set(RW/2-2,1,-1.8);p.add(oL);
-    fl.push({light:oL,baseIntensity:1,idx:16});
+    const oL=new THREE.PointLight(0xff4400, 1 * 100, 5);oL.position.set(RW/2-2,1,-1.8);p.add(oL);
+    fl.push({light:oL,baseIntensity:1 * 100,idx:16});
 
     // POT RACK
     const rack=new THREE.Group();

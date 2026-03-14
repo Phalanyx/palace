@@ -1,13 +1,10 @@
-import { GoogleGenAI, Type } from "@google/genai"
+import { Type } from "@google/genai"
+import { ai } from "./gemini"
 import { prisma } from "./prisma"
 import { uploadToMoorcheh, createNamespace } from "./moorcheh"
 import { createClient } from '@supabase/supabase-js'
 import { generateAllMeshes } from "./meshGenerator"
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })
+import sharp from 'sharp'
 
 const palaceSchema = {
   type: Type.ARRAY,
@@ -52,6 +49,62 @@ const palaceSchema = {
   }
 }
 
+async function generateAndSaveCoverImage(
+  palaceId: string,
+  title: string,
+  prompt: string,
+) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabase = createClient(supabaseUrl, supabaseKey)
+
+  const imagePrompt =
+    `Low-poly 3D render of a scene about "${title}". ` +
+    `Show iconic objects and environments unique to this subject — NOT a generic landscape or campsite. ` +
+    `Faceted geometric polygons, flat-shaded triangulated faces. ` +
+    `Use these colors: forest green, moss green, deep teal, muted sand, stone gray, muted purple, warm orange, amber yellow, frost teal, deep cyan, olive, soft red, and slate blue. ` +
+    `Soft dramatic lighting, clean composition. ` +
+    `ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO LABELS, NO WRITING of any kind anywhere in the image.`
+
+  const result = await ai.models.generateImages({
+    model: 'imagen-4.0-generate-001',
+    prompt: imagePrompt,
+    config: { numberOfImages: 1, aspectRatio: '16:9' },
+  })
+
+  const imageBytes = result.generatedImages?.[0]?.image?.imageBytes
+  if (!imageBytes) throw new Error('No image bytes returned')
+
+  const rawBuffer = Buffer.from(imageBytes as string, 'base64')
+  console.log(`Cover image raw size: ${(rawBuffer.length / 1024 / 1024).toFixed(1)}MB`)
+
+  // Compress to JPEG (max 1280px wide, 80% quality) to keep under storage limits
+  const buffer = await sharp(rawBuffer)
+    .resize({ width: 1280, withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer()
+  console.log(`Cover image compressed size: ${(buffer.length / 1024).toFixed(0)}KB`)
+
+  const storagePath = `covers/${palaceId}.jpg`
+
+  const { error } = await supabase.storage
+    .from('palace-models')
+    .upload(storagePath, buffer, { contentType: 'image/jpeg', upsert: true })
+
+  if (error) throw error
+
+  const { data: urlData } = supabase.storage
+    .from('palace-models')
+    .getPublicUrl(storagePath)
+
+  await prisma.palace.update({
+    where: { id: palaceId },
+    data: { coverImageUrl: urlData.publicUrl },
+  })
+
+  console.log(`Cover image saved for palace ${palaceId}`)
+}
+
 export async function processDocuments(palaceId: string) {
   try {
     const palace = await prisma.palace.findUnique({
@@ -66,6 +119,11 @@ export async function processDocuments(palaceId: string) {
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
+    // 1a. Generate cover image in the background — save to palace as soon as ready
+    generateAndSaveCoverImage(palace.id, palace.title, palace.prompt).catch(err =>
+      console.error('Non-fatal: cover image generation failed:', err)
+    )
+
     const combinedTextArray: string[] = []
     const documentChunks: { id: string; text: string; metadata?: any }[] = []
 
@@ -79,33 +137,22 @@ export async function processDocuments(palaceId: string) {
       }
       
       const buffer = Buffer.from(await data.arrayBuffer())
-      const tempFilePath = path.join(os.tmpdir(), `upload-${doc.id}-${doc.fileName}`)
-      fs.writeFileSync(tempFilePath, buffer)
+      const base64Data = buffer.toString('base64')
+      const mimeType = doc.fileType === 'pdf' ? 'application/pdf' :
+                       (doc.fileType === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 'text/plain')
 
-      console.log(`Uploading ${doc.fileName} to Gemini...`)
-      const uploadResult = await ai.files.upload({
-        file: tempFilePath,
-        config: {
-          mimeType: doc.fileType === 'pdf' ? 'application/pdf' : 
-                   (doc.fileType === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 'text/plain')
-        }
-      })
-      console.log(`Uploaded to Gemini as ${uploadResult.name}`)
+      console.log(`Processing ${doc.fileName} (${(buffer.length / 1024).toFixed(0)}KB, ${mimeType})...`)
 
       const transcriptionPrompt = "Extract and transcribe all the visible text content from this document from start to finish. Output ONLY the raw text without any markdown or formatting additions."
       const transcriptionResult = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [
-          { role: "user", parts: [{ text: transcriptionPrompt }, { fileData: { fileUri: uploadResult.uri, mimeType: uploadResult.mimeType } }] }
+          { role: "user", parts: [{ text: transcriptionPrompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
       })
 
       const text = transcriptionResult.text || ""
       combinedTextArray.push(`--- Document: ${doc.fileName} ---\n${text}`)
-
-      // Cleanup
-      fs.unlinkSync(tempFilePath)
-      await ai.files.delete({ name: uploadResult.name! })
 
       // Prepare chunks for Moorcheh (approx 2000 chars per chunk)
       const chunkSize = 2000
