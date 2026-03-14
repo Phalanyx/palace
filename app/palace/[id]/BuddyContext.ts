@@ -20,7 +20,7 @@ export interface BuddyContextInput {
 export function buildSystemPrompt(ctx: BuddyContextInput): string {
   const namespace = `albertPalace${ctx.palaceId}`;
 
-  let prompt = `You are a friendly, encouraging study buddy helping the user learn: "${ctx.palaceTitle}".
+  let prompt = `You are a friendly, encouraging study buddy named Ada helping the user learn: "${ctx.palaceTitle}".
 Their learning goal: ${ctx.palacePrompt}.
 
 COURSE CONTENT:

@@ -139,37 +139,42 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'rgba(10,10,20,0.92)',
-              border: `2px solid ${accentColor}`,
+              background: 'rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(16px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+              border: '1px solid rgba(255,255,255,0.15)',
               borderRadius: '16px',
               padding: '14px 18px',
               width: '260px',
               color: '#fff',
-              fontFamily: 'system-ui, sans-serif',
-              boxShadow: `0 0 24px ${accentColor}88`,
+              fontFamily: 'var(--font-baloo), "Baloo 2", sans-serif',
+              fontWeight: 500,
+              fontSize: '0.875rem',
+              boxShadow: `0 0 24px ${accentColor}44, 0 8px 32px rgba(0,0,0,0.3)`,
               pointerEvents: 'auto',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{
-                background: accentColor,
-                color: '#000',
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#fff',
                 borderRadius: 6,
                 padding: '2px 8px',
-                fontSize: 11,
-                fontWeight: 700,
+                fontSize: '0.6875rem',
+                fontWeight: 600,
               }}>
                 {mode === 'test' ? '❓ Question' : (objectData.metadata?.itemType ?? objectData.label)}
               </span>
               <button
                 onClick={() => { setClick(false); onClose?.(); onObjectClose?.(objectData.id); }}
-                style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 16, cursor: 'pointer', fontFamily: 'inherit' }}
               >✕</button>
             </div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: accentColor }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: '0.9375rem', fontWeight: 600, color: '#fff', textShadow: `0 0 12px ${accentColor}66` }}>
               {objectData.label}
             </h3>
-            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#ccc' }}>
+            <p style={{ margin: 0, fontSize: '0.8125rem', lineHeight: 1.55, color: 'rgba(255,255,255,0.85)' }}>
               {mode === 'test'
                 ? (objectData.sampleQuestion ?? objectData.description)
                 : objectData.description}
