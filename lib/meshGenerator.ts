@@ -20,66 +20,35 @@ const FALLBACK_CODE = `
   return new THREE.Mesh(geometry, material);
 `;
 
-function suggestGeometry(itemType: string): string {
-  const t = itemType.toLowerCase();
-  
-  if (t.includes('sword') || t.includes('blade') || t.includes('knife') || t.includes('key')) {
-    return 'ExtrudeGeometry (to create a specific silhouette profile) or BoxGeometry (stacked carefully)';
-  }
-  if (t.includes('book') || t.includes('box') || t.includes('chest') || t.includes('block') || t.includes('scale')) {
-    return 'BoxGeometry (multiple boxes scaled and positioned inside a Group)';
-  }
-  if (t.includes('ring') || t.includes('halo') || t.includes('donut') || t.includes('band') || t.includes('magnet')) {
-    return 'TorusGeometry or TubeGeometry with low radial segments (e.g. 4-6)';
-  }
-  if (t.includes('tube') || t.includes('pipe') || t.includes('telescope') || t.includes('pole') || t.includes('pillar') || t.includes('lighthouse') || t.includes('funnel')) {
-    return 'CylinderGeometry with low radial segments (e.g. 5-8)';
-  }
-  if (t.includes('sphere') || t.includes('ball') || t.includes('orb') || t.includes('globe') || t.includes('bubble') || t.includes('sprout')) {
-    return 'IcosahedronGeometry (to get a low poly sphere) or DodecahedronGeometry';
-  }
-  if (t.includes('spike') || t.includes('horn') || t.includes('cone') || t.includes('parachute')) {
-    return 'ConeGeometry or CylinderGeometry (with a top radius of 0) with low radial segments (e.g. 4-6)';
-  }
-  if (t.includes('crystal') || t.includes('gem') || t.includes('diamond')) {
-    return 'OctahedronGeometry or IcosahedronGeometry (detail: 0)';
-  }
-
-  // Default fallback suggestion
-  return 'LatheGeometry, ExtrudeGeometry, or an assembly of primitive geometries';
-}
-
 async function generateSingleMesh(
   obj: { id: string; itemType: string; label: string; description: string }
 ): Promise<string> {
   const maxRetries = 3;
   let previousErrors = "";
 
-  const recommendedGeometry = suggestGeometry(obj.itemType);
+  const basePrompt = `You are a 3D artist building a memory palace — a mnemonic learning tool where physical objects help someone REMEMBER academic concepts. Your job: write raw JavaScript (for Three.js) that returns a THREE.Object3D.
 
-  const basePrompt = `You are an expert 3D mesh designer writing raw, executable JavaScript for Three.js.
-Your task is to generate the inner body of a JavaScript function that returns a \`THREE.Object3D\` (such as a \`THREE.Group\` or \`THREE.Mesh\`) representing the following concept.
+THE CONCEPT TO REMEMBER:
+"${obj.label}" — ${obj.description}
 
-OBJECT TO MODEL:
-Label: ${obj.label}
-Description: ${obj.description}
-Physical METAPHOR / Item Type: ${obj.itemType}
+THE PHYSICAL OBJECT CHOSEN AS A METAPHOR: "${obj.itemType}"
 
-RECOMMENDED GEOMETRY APPROACH:
-${recommendedGeometry}
+YOUR CREATIVE GOAL:
+A person walks into a 3D room and sees this object. They should IMMEDIATELY think: "Ah, that's about ${obj.label}!"
+Think about WHY "${obj.itemType}" represents "${obj.label}". What visual features of a ${obj.itemType} echo the concept? Lean into those features:
+- If the metaphor is about STRUCTURE (e.g. a Zipper for DNA Replication), emphasize the interlocking/parallel structure.
+- If the metaphor is about TRANSFORMATION (e.g. a Cocoon for Metamorphosis), show the transitional form.
+- If the metaphor is about FLOW or DIRECTION (e.g. a Funnel for Data Pipeline), make the directional shape clear.
+- If the metaphor is about BALANCE or TENSION (e.g. a Scale for Supply & Demand), show opposing forces.
+Build a recognizable, detailed silhouette of "${obj.itemType}" — not a generic blob. Use multiple parts in a THREE.Group to capture the distinct features (handle, blade, pages, teeth, petals, etc.).
 
-IMPORTANT INSTRUCTIONS FOR THE CODE:
-1. You have access to the global \`THREE\` object. DO NOT import or require Three.js.
-2. Build expressive LOW-POLY shapes. DO NOT just stack primitive boxes and spheres! Choose geometries that perfectly represent the item's silhouette.
-3. CRITICAL: For circular geometries (CylinderGeometry, SphereGeometry, ConeGeometry, TorusGeometry, TubeGeometry, LatheGeometry), you MUST specify extremely low segment counts (e.g., 3, 4, 5, 6, 8 max!) to emphasize distinct flat faces. NEVER use 32, 16, or 24 segments. E.g., \`new THREE.CylinderGeometry(radius, radius, height, 6)\`.
-4. Keep the object roughly contained within a 1.5x1.5x1.5 bounding box around the origin (0, 0, 0).
-5. Apply expressive materials. Use \`THREE.MeshPhysicalMaterial\` with neon colors, high emissive values (\`emissive: new THREE.Color(...)\`, \`emissiveIntensity: 2.5\`), roughness, and metalness, so the objects glow beautifully in a dark scene. Use these colors as HEX (e.g. 0xff00ff). 
-6. CRITICAL: ALWAYS include \`flatShading: true\` in ALL \`THREE.MeshPhysicalMaterial\` options to enforce the low-poly aesthetic.
-7. Create an overarching \`THREE.Group\` to combine multiple meshes if needed, and finally \`return group;\` or \`return mesh;\` at the end of your code snippet.
-8. RETURN ONLY NAKED JAVASCRIPT CODE. DO NOT wrap your response in markdown (\`\`\`javascript) or any other formatting. We run the code exactly as you output it. No explanations.
-
-COLOR RULES — pick from these neons, or mix them contextually:
-  0xff00ff, 0x00ffff, 0xccff00, 0xff6600, 0x00ff88, 0xff0088, 0xaa00ff, 0xffff00
+THREE.JS RULES:
+1. \`THREE\` is a global. Do NOT import/require anything.
+2. Low-poly aesthetic: use low segment counts (3-8) on all circular geometries. Always set \`flatShading: true\` on materials.
+3. Use \`THREE.MeshPhysicalMaterial\` with neon emissive glow (emissiveIntensity ~2.0-3.0). Pick colors that feel thematically right for the concept — warm tones for energy/life, cool tones for logic/structure, etc. Available neons: 0xff00ff, 0x00ffff, 0xccff00, 0xff6600, 0x00ff88, 0xff0088, 0xaa00ff, 0xffff00.
+4. Keep the object within a 1.5×1.5×1.5 bounding box centered at origin.
+5. Return ONLY raw JavaScript code — no markdown fences, no comments, no explanations. The code is executed directly via \`new Function('THREE', code)\`.
+6. The final line must be \`return group;\` or \`return mesh;\`.
 `;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {

@@ -240,6 +240,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+  const recentPalacesRef = useRef<HTMLDivElement>(null)
 
   async function handleGenerate() {
     if (!inputText.trim() || isGenerating) return
@@ -270,6 +271,9 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
       }, ...prev])
       setInputText("")
       setAttachedFiles([])
+      setTimeout(() => {
+        recentPalacesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
     } catch {
       setGenerateError('Network error — please try again')
     } finally {
@@ -280,12 +284,12 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
   return (
     <div className="min-h-screen bg-[#0d0d10] text-white font-sans">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 absolute top-0 inset-x-0 z-20">
+      <nav className="grid grid-cols-3 items-center px-6 py-4 absolute top-0 inset-x-0 z-20">
         <div className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/palace_logo.png" alt="Palace" className="h-20 w-auto" />
         </div>
-        <div className="flex items-center bg-white/10 border border-white/20 rounded-full px-1 py-1 gap-1 backdrop-blur-sm">
+        <div className="flex items-center justify-self-center bg-white/10 border border-white/20 rounded-full px-1 py-1 gap-1 backdrop-blur-sm">
           {[
             { label: "Home", icon: <Home className="w-3.5 h-3.5" />, active: true },
             { label: "Projects", icon: <FolderOpen className="w-3.5 h-3.5" /> },
@@ -296,7 +300,9 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             </button>
           ))}
         </div>
-        <AvatarMenu initials={getInitials(userEmail)} email={userEmail} />
+        <div className="justify-self-end">
+          <AvatarMenu initials={getInitials(userEmail)} email={userEmail} />
+        </div>
       </nav>
 
       {/* Hero with dragon scene background */}
@@ -347,14 +353,11 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
               </div>
               <button
                 onClick={handleGenerate}
-                className="flex items-center gap-2 px-4 h-10 rounded-full bg-white/90 text-[#0d0d10] hover:bg-white transition-colors disabled:opacity-30 font-semibold text-sm"
+                className="w-10 h-10 rounded-full bg-white/90 text-[#0d0d10] hover:bg-white transition-colors disabled:opacity-30 flex items-center justify-center"
                 disabled={!inputText.trim() || isGenerating}
               >
                 {isGenerating ? (
-                  <>
-                    <RotateCw className="w-4 h-4 animate-spin" />
-                    Building...
-                  </>
+                  <RotateCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <ArrowUp className="w-5 h-5" />
                 )}
@@ -367,20 +370,12 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
             <p className="text-red-400 text-sm mb-3 -mt-2">{generateError}</p>
           )}
 
-          {/* Quick action pills */}
-          <div className="flex items-center justify-center gap-3">
-            {["Recreate Screenshot", "Import from Site", "Explore Effects"].map(label => (
-              <button key={label} className="px-4 py-2 rounded-full border border-white/30 bg-white/20 backdrop-blur text-sm text-white hover:bg-white/30 transition-colors">
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       {/* Recent Palaces */}
       <div className="max-w-7xl mx-auto px-6 mb-16 pt-10">
-        <h2 className="text-2xl font-bold text-white mb-6">Recent Palaces</h2>
+        <h2 ref={recentPalacesRef} className="text-2xl font-bold text-white mb-6 scroll-mt-6">Recent Palaces</h2>
         {palaces.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-white/10 rounded-2xl text-white/30">
             No palaces yet — describe one above to get started.
