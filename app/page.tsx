@@ -17,7 +17,7 @@ export default function Home() {
       </div> */}
 
       {/* Button overlay */}
-      {/* <div className="relative z-10 min-h-screen flex flex-col items-center justify-end pb-20">
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-end pb-20">
         <div className="w-full max-w-sm mx-auto px-4">
           <Link
             href="/dashboard"
@@ -28,7 +28,7 @@ export default function Home() {
             <ArrowRight className="w-6 h-6 group-hover:translate-x-1.5 transition-transform" />
           </Link>
         </div>
-      </div> */}
+      </div>
     </div>
   );
 }

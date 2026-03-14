@@ -14,7 +14,12 @@ interface Question {
 
 type Phase = 'idle' | 'setup' | 'loading' | 'quiz' | 'submitting' | 'results';
 
-export default function TestFlow({ palaceId }: { palaceId: string }) {
+interface TestFlowProps {
+  palaceId: string;
+  onTestModeChange?: (active: boolean, currentQuestion?: string) => void;
+}
+
+export default function TestFlow({ palaceId, onTestModeChange }: TestFlowProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [gradingInstructions, setGradingInstructions] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -41,6 +46,7 @@ export default function TestFlow({ palaceId }: { palaceId: string }) {
       setAnswers({});
       setCurrentIdx(0);
       setPhase('quiz');
+      onTestModeChange?.(true, data.questions[0]?.questionText);
     } catch (e: any) {
       setError(e.message);
       setPhase('setup');
@@ -72,6 +78,7 @@ export default function TestFlow({ palaceId }: { palaceId: string }) {
       })));
       setScorePct(data.scorePct);
       setPhase('results');
+      onTestModeChange?.(false);
     } catch (e: any) {
       setError(e.message);
       setPhase('quiz');
@@ -188,7 +195,11 @@ export default function TestFlow({ palaceId }: { palaceId: string }) {
         <div className="flex gap-3">
           {currentIdx > 0 && (
             <button
-              onClick={() => setCurrentIdx(i => i - 1)}
+              onClick={() => {
+                const next = currentIdx - 1;
+                setCurrentIdx(next);
+                onTestModeChange?.(true, questions[next]?.questionText);
+              }}
               className="bg-indigo-50 text-indigo-700 font-bold py-3 px-6 rounded-xl hover:bg-indigo-100 transition-colors"
             >
               ← Back
@@ -196,7 +207,11 @@ export default function TestFlow({ palaceId }: { palaceId: string }) {
           )}
           {!isLast ? (
             <button
-              onClick={() => setCurrentIdx(i => i + 1)}
+              onClick={() => {
+                const next = currentIdx + 1;
+                setCurrentIdx(next);
+                onTestModeChange?.(true, questions[next]?.questionText);
+              }}
               className="flex-grow bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
             >
               Next <ChevronRight className="w-4 h-4" />
@@ -272,7 +287,7 @@ export default function TestFlow({ palaceId }: { palaceId: string }) {
         </div>
 
         <button
-          onClick={() => { setPhase('idle'); setResults([]); setScorePct(null); }}
+          onClick={() => { setPhase('idle'); setResults([]); setScorePct(null); onTestModeChange?.(false); }}
           className="w-full bg-indigo-50 text-indigo-700 font-bold py-4 px-6 rounded-2xl hover:bg-indigo-100 transition-colors"
         >
           Take Another Test

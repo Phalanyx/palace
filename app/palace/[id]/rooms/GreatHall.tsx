@@ -13,7 +13,7 @@ const GREAT_HALL_SLOTS: [number, number, number][] = [
   [7, 5, -2]           // On the right balcony
 ];
 
-export function GreatHall({ objects = [], activeObjectIdx = -1, onCloseObject, mode = 'learn' }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void; mode?: 'learn' | 'test' }) {
+export function GreatHall({ objects = [], activeObjectIdx = -1, onCloseObject, onObjectOpen, onObjectClose, mode = 'learn' }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void; onObjectOpen?: (id: string) => void; onObjectClose?: (id: string) => void; mode?: 'learn' | 'test' }) {
   const { group, flickerLights } = useMemo(() => {
     const parent = new THREE.Group();
     const fl: any[] = [];
@@ -537,7 +537,7 @@ export function GreatHall({ objects = [], activeObjectIdx = -1, onCloseObject, m
 
       {/* Dynamic Objects */}
       {objects.slice(0, 5).map((obj, i) => (
-        <DynamicObject key={obj.id} objectData={obj} position={GREAT_HALL_SLOTS[i]} forceOpen={i === activeObjectIdx} onClose={onCloseObject} mode={mode} />
+        <DynamicObject key={obj.id} objectData={obj} position={GREAT_HALL_SLOTS[i]} forceOpen={i === activeObjectIdx} onClose={onCloseObject} onObjectOpen={onObjectOpen} onObjectClose={onObjectClose} mode={mode} />
       ))}
     </>
   );
