@@ -1,10 +1,23 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useTransition } from "react"
 import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, Paperclip, Home, FolderOpen, BookOpen, LogOut } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { Avatar, AvatarFallback } from "@/components/ui/glass/avatar"
+import {
+  DropdownMenuGroup,
+} from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/glass/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/glass/tabs"
 import DragonSceneLoader from "../components/DragonSceneLoader"
 
 // ─── Color palette (warm zinc + blue, Notion/Arc-inspired) ───────────────────
@@ -157,54 +170,65 @@ const PROMPTS = [
 ]
 
 const FILTER_TABS = ["ALL", "STYLE", "THEME", "STRUCTURE", "LEARNING METHOD"]
+const NAV_TABS = [
+  { value: "home", label: "Home", icon: Home },
+  { value: "projects", label: "Projects", icon: FolderOpen },
+  { value: "prompt-library", label: "Prompt Library", icon: BookOpen },
+]
 
 function AvatarMenu({ initials, email }: { initials: string, email: string | null }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const displayName = email?.split("@")[0]?.replace(/[._-]+/g, " ") || "Palace user"
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handleClick)
-    return () => document.removeEventListener("mousedown", handleClick)
-  }, [])
-
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace("/")
-    router.refresh()
+  function handleSignOut() {
+    startTransition(async () => {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.replace("/")
+      router.refresh()
+    })
   }
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-9 h-9 rounded-full bg-white/20 border border-white/30 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white hover:bg-white/30 transition-colors"
-      >
-        {initials}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-12 w-56 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl p-3 shadow-2xl z-50">
-          {email && (
-            <div className="px-2 py-1.5 mb-2">
-              <p className="text-white/40 text-xs truncate">{email}</p>
-            </div>
-          )}
-          <div className="h-px bg-white/10 mb-2" />
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
           <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </button>
-        </div>
-      )}
-    </div>
+            type="button"
+            aria-label="Open profile menu"
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d0d10]"
+          />
+        }
+      >
+        <Avatar size="md" glow>
+          <AvatarFallback>
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" sideOffset={12} className="w-64">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <p>Profile</p>
+            <p className="truncate">{displayName}</p>
+            {email ? (
+              <p className="truncate text-xs">{email}</p>
+            ) : null}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup>
+          <DropdownMenuItem disabled={isPending} onClick={handleSignOut}>
+            <LogOut />
+            {isPending ? "Signing out..." : "Sign out"}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -219,6 +243,7 @@ function getInitials(email: string | null) {
 export default function DashboardClient({ initialPalaces, userEmail }: { initialPalaces: Palace[], userEmail: string | null }) {
   const [palaces, setPalaces] = useState(initialPalaces)
   const [inputText, setInputText] = useState("")
+  const [activeNavTab, setActiveNavTab] = useState("home")
   const [activeFilter, setActiveFilter] = useState("ALL")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -268,17 +293,23 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/palace_logo.png" alt="Palace" className="h-20 w-auto" />
         </div>
-        <div className="flex items-center bg-white/10 border border-white/20 rounded-full px-1 py-1 gap-1 backdrop-blur-sm">
-          {[
-            { label: "Home", icon: <Home className="w-3.5 h-3.5" />, active: true },
-            { label: "Projects", icon: <FolderOpen className="w-3.5 h-3.5" /> },
-            { label: "Prompt Library", icon: <BookOpen className="w-3.5 h-3.5" /> },
-          ].map(({ label, icon, active }) => (
-            <button key={label} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${active ? 'bg-white/20 text-white shadow-sm' : 'text-white/60 hover:text-white'}`}>
-              {icon}{label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={activeNavTab} onValueChange={setActiveNavTab} className="gap-0">
+          <TabsList
+            hover="lift"
+            className="rounded-full border border-white/20 bg-white/10 p-1 backdrop-blur-sm"
+          >
+            {NAV_TABS.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-white/60 data-active:bg-white/20 data-active:text-white data-active:shadow-sm hover:text-white"
+              >
+                <Icon data-icon="inline-start" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         <AvatarMenu initials={getInitials(userEmail)} email={userEmail} />
       </nav>
 
@@ -437,7 +468,7 @@ export default function DashboardClient({ initialPalaces, userEmail }: { initial
 function CreatePalaceModal({ initialPrompt, onClose, onSuccess }: {
   initialPrompt: string
   onClose: () => void
-  onSuccess: (p: any) => void
+  onSuccess: (p: Palace) => void
 }) {
   const [title, setTitle] = useState("")
   const [prompt, setPrompt] = useState(initialPrompt)
@@ -456,7 +487,7 @@ function CreatePalaceModal({ initialPrompt, onClose, onSuccess }: {
       const res = await fetch("/api/palaces", { method: "POST", body: formData })
       if (res.ok) {
         const data = await res.json()
-        onSuccess({ id: data.palaceId, title, prompt, status: 'processing', _count: { rooms: 0 }, createdAt: new Date().toISOString() })
+        onSuccess({ id: data.palaceId, title, prompt, status: 'processing', _count: { rooms: 0 } })
       }
     } catch (err) {
       console.error(err)
