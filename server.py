@@ -14,15 +14,111 @@ import ssl
 import certifi
 import os
 import google.auth
+from dotenv import load_dotenv
+import traceback
 from websockets.legacy.server import WebSocketServerProtocol
 from websockets.legacy.protocol import WebSocketCommonProtocol
 from websockets.exceptions import ConnectionClosed
+from moorcheh_sdk import MoorchehClient
 
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
 
-DEBUG = False  # Set to True for verbose logging
+# Set to True for verbose logging
+DEBUG = False
 WS_PORT = int(os.environ.get("PORT", "8080"))
+
+# Load environment variables from .env file
+load_dotenv(override=True)
+
+# MOORCHEH SETUP
+MOORCHEH_API_URL = "https://api.moorcheh.ai/v1"
+MOORCHEH_API_KEY = os.environ.get("MOORCHEH_API_KEY", "")
+
+if MOORCHEH_API_KEY and len(MOORCHEH_API_KEY) > 4:
+    print(f"✅ [MOORCHEH] API Key loaded (starts with {MOORCHEH_API_KEY[:4]}...)")
+elif MOORCHEH_API_KEY:
+    print(f"✅ [MOORCHEH] API Key loaded (too short to mask)")
+else:
+    print("⚠️ [MOORCHEH] No API Key found in environment or .env file")
+
+# Initialize Moorcheh Client
+moorcheh_client = MoorchehClient(api_key=MOORCHEH_API_KEY) if MOORCHEH_API_KEY else None
+
+def handle_moorcheh_tool(tool_name: str, args: dict) -> dict:
+    namespace = args.get("namespace", "")
+    query = args.get("query", "")
+    
+    if not moorcheh_client:
+        return {"error": "Moorcheh Client not initialized (missing API key)"}
+    
+    if not namespace or not query:
+        return {"error": "Missing namespace or query"}
+        
+    print(f"🐜 [MOORCHEH SDK] Executing Tool: {tool_name} | Namespace: {namespace} | Query: {query}")
+        
+    try:
+        if tool_name == "askMoorcheh":
+            # Using get_generative_answer from SDK
+            # Note: SDK currently uses 'namespace' and 'query'
+            response = moorcheh_client.get_generative_answer(
+                namespace=namespace,
+                query=query
+            )
+            return response
+        elif tool_name == "searchMoorcheh":
+            # Using get_search_results from SDK
+            response = moorcheh_client.get_search_results(
+                namespace=namespace,
+                query=query,
+                top_k=3,
+                threshold=0.70
+            )
+            return response
+        else:
+            return {"error": f"Unknown tool: {tool_name}"}
+    except Exception as e:
+        print(f"❌ [MOORCHEH SDK ERROR] {e}")
+        return {"error": str(e)}
+
+MOORCHEH_TOOLS = [
+    {
+        "name": "askMoorcheh",
+        "description": "Ask a question to the Moorcheh knowledge base. This is the primary way to get answers from the course material. Returns a generated answer based on the documents.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "namespace": {
+                    "type": "STRING",
+                    "description": "The namespace to search in (provided in the system prompt)."
+                },
+                "query": {
+                    "type": "STRING",
+                    "description": "The specific question to ask based on the user's inquiry."
+                }
+            },
+            "required": ["namespace", "query"]
+        }
+    },
+    {
+        "name": "searchMoorcheh",
+        "description": "Search the Moorcheh knowledge base for specific facts or excerpts. Returns search results rather than a synthesized answer.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "namespace": {
+                    "type": "STRING",
+                    "description": "The namespace to search in (provided in the system prompt)."
+                },
+                "query": {
+                    "type": "STRING",
+                    "description": "The specific search query or keywords."
+                }
+            },
+            "required": ["namespace", "query"]
+        }
+    }
+]
 
 
 def generate_access_token():
@@ -80,21 +176,67 @@ async def proxy_task(
 ) -> None:
     """
     Forwards messages from source_websocket to destination_websocket.
-
-    Args:
-        source_websocket: The WebSocket connection to receive messages from.
-        destination_websocket: The WebSocket connection to send messages to.
-        is_server: True if source is server side, False otherwise.
+    Intercepts client tool setup and server tool calls.
     """
     try:
         async for message in source_websocket:
             try:
                 data = json.loads(message)
+                
+                # [CLIENT -> SERVER] Inject tools into the setup message
+                if not is_server and "setup" in data:
+                    print("🔧 [SETUP] Intercepting setup message to inject tools")
+                    if "tools" not in data["setup"]:
+                        data["setup"]["tools"] = []
+                    
+                    # Add function declarations array if missing
+                    found_funcs = False
+                    if isinstance(data["setup"]["tools"], list):
+                        for t in data["setup"]["tools"]:
+                            if "function_declarations" in t:
+                                t["function_declarations"].extend(MOORCHEH_TOOLS)
+                                found_funcs = True
+                        if not found_funcs:
+                            data["setup"]["tools"].append({"function_declarations": MOORCHEH_TOOLS})
+                    elif isinstance(data["setup"]["tools"], dict):
+                        if "function_declarations" not in data["setup"]["tools"]:
+                            data["setup"]["tools"]["function_declarations"] = []
+                        data["setup"]["tools"]["function_declarations"].extend(MOORCHEH_TOOLS)
+                    
+                # [SERVER -> CLIENT] Intercept tool calls
+                if is_server and "toolCall" in data:
+                    function_calls = data["toolCall"].get("functionCalls", [])
+                    tool_responses = []
+                    
+                    for call in function_calls:
+                        call_id = call.get("id")
+                        name = call.get("name")
+                        args = call.get("args", {})
+                        
+                        if name in ["askMoorcheh", "searchMoorcheh"]:
+                            result = handle_moorcheh_tool(name, args)
+                            tool_responses.append({
+                                "id": call_id,
+                                "name": name,
+                                "response": result
+                            })
+                    
+                    if tool_responses:
+                        print(f"🔧 [TOOL RESPONSE] Sending {len(tool_responses)} tool responses back to Gemini")
+                        tool_response_msg = {
+                            "tool_response": {
+                                "function_responses": tool_responses
+                            }
+                        }
+                        await source_websocket.send(json.dumps(tool_response_msg))
+
                 if DEBUG:
                     print(f"Proxying from {'server' if is_server else 'client'}: {data}")
+                    
                 await destination_websocket.send(json.dumps(data))
             except Exception as e:
                 print(f"Error processing message: {e}")
+                traceback.print_exc()
     except ConnectionClosed as e:
         print(
             f"{'Server' if is_server else 'Client'} connection closed: {e.code} - {e.reason}"

@@ -1,5 +1,6 @@
 export interface BuddyContextInput {
   palaceTitle: string;
+  palaceId: string;
   palacePrompt: string;
   documentSummaries: string[];
   currentRoom: {
@@ -17,6 +18,8 @@ export interface BuddyContextInput {
 }
 
 export function buildSystemPrompt(ctx: BuddyContextInput): string {
+  const namespace = `albertPalace${ctx.palaceId}`;
+
   let prompt = `You are a friendly, encouraging study buddy helping the user learn: "${ctx.palaceTitle}".
 Their learning goal: ${ctx.palacePrompt}.
 
@@ -25,6 +28,14 @@ ${ctx.documentSummaries.length > 0
   ? ctx.documentSummaries.map((s, i) => `Document ${i + 1}:\n${s}`).join('\n\n')
   : '(No document content available — use the object descriptions as your source of truth.)'
 }
+
+IMPORTANT: You are a learning assistant. While you should keep the conversation focused on the CURRENT object (see FOCUSED TOPIC below), you should be helpful and exhaustive when answering questions ABOUT that topic. 
+
+If the user asks for more depth, specific facts, or information that isn't in your immediate memory, YOU MUST use the "askMoorcheh" or "searchMoorcheh" tools to find the answer. Do not guess and do not refuse to answer if the tool could provide the information.
+
+If the user goes completely off-topic (e.g. asking about unrelated things not in the room), then politely redirect them to the current topic. However, detailed questions about the focused object are NEVER off-topic.
+
+Use namespace "${namespace}" for all tool calls. Use searchMoorcheh to find facts/excerpts, and askMoorcheh to get a synthesized answer based on the documents.
 `;
 
   if (ctx.currentRoom) {
