@@ -175,7 +175,7 @@ export function GreatHall() {
       const sill = new THREE.Mesh(jitter(new THREE.BoxGeometry(winW + 0.8, 0.25, 0.8, 2, 1, 1), 0.03), mat(0x7a6a4a));
       sill.position.y = -0.1; sill.castShadow = true; g.add(sill);
 
-      const wLight = new THREE.SpotLight(0x5577cc, 1.0 * 200, 20, Math.PI / 5, 0.7);
+      const wLight = new THREE.SpotLight(0x3355aa, 0.3 * 100, 10, Math.PI / 5, 0.7);
       wLight.position.set(0, wH / 2, -0.5);
       const tgt = new THREE.Object3D();
       tgt.position.set(0, 0, 6);
@@ -399,9 +399,9 @@ export function GreatHall() {
         fl.push({ flame: f, idx: i });
       }
       g.position.set(x, RH - 0.5, z); parent.add(g);
-      const pl = new THREE.PointLight(0xffaa44, 2.5 * 250, 25);
+      const pl = new THREE.PointLight(0xffaa44, 2.5 * 100, 18);
       pl.position.set(x, RH - 2, z); pl.castShadow = true; pl.shadow.mapSize.set(512, 512); parent.add(pl);
-      fl.push({ light: pl, baseIntensity: 2.5 * 250, idx: Math.random() * 10 });
+      fl.push({ light: pl, baseIntensity: 2.5 * 100, idx: Math.random() * 10 });
     }
     makeChandelier(0, -2);
     makeChandelier(0, 3);
@@ -415,9 +415,9 @@ export function GreatHall() {
       const flame = new THREE.Mesh(new THREE.SphereGeometry(0.15, 4, 4), new THREE.MeshBasicMaterial({ color: 0xff9933 }));
       flame.scale.y = 1.8; flame.position.y = 1.05; g.add(flame);
       g.position.set(x, y, z); g.rotation.y = ry; parent.add(g);
-      const tl = new THREE.PointLight(0xff8822, 1.5 * 200, 15);
+      const tl = new THREE.PointLight(0xff8822, 1.2 * 100, 10);
       tl.position.set(x, y + 1.3, z); tl.castShadow = true; parent.add(tl);
-      fl.push({ flame, light: tl, baseIntensity: 1.5 * 200, idx: Math.random() * 20 });
+      fl.push({ flame, light: tl, baseIntensity: 1.2 * 100, idx: Math.random() * 20 });
     }
     for (let z = -6; z <= 6; z += 4) {
       makeTorch(-RW / 2 + 0.6, 5, z, Math.PI / 2);
@@ -444,9 +444,9 @@ export function GreatHall() {
       log.position.set((Math.random() - 0.5) * 0.5, 0.4 + i * 0.2, (Math.random() - 0.5) * 0.2); fp.add(log);
     }
     fp.position.set(RW / 2 - 0.6, 0, 0); fp.rotation.y = -Math.PI / 2; parent.add(fp);
-    const fpLight = new THREE.PointLight(0xff6622, 2 * 250, 20);
+    const fpLight = new THREE.PointLight(0xff6622, 2 * 100, 12);
     fpLight.position.set(RW / 2 - 2, 2, 0); fpLight.castShadow = true; parent.add(fpLight);
-    fl.push({ light: fpLight, baseIntensity: 2 * 250, idx: 7 });
+    fl.push({ light: fpLight, baseIntensity: 2 * 100, idx: 7 });
     const chimney = new THREE.Mesh(jitter(new THREE.BoxGeometry(4, 8, 1, 2, 4, 1), 0.06), mat(C.stoneD));
     chimney.position.set(RW / 2 - 0.5, 9, 0); parent.add(chimney);
 
@@ -493,8 +493,8 @@ export function GreatHall() {
     skyBox.position.y = RH / 2; parent.add(skyBox);
 
     // LIGHTING
-    parent.add(new THREE.AmbientLight(0x3a3a2a, 1.5 * Math.PI));
-    const moon = new THREE.DirectionalLight(0x7799cc, 1.0 * Math.PI);
+    parent.add(new THREE.AmbientLight(0x2a2a1a, 0.3 * Math.PI));
+    const moon = new THREE.DirectionalLight(0x5577aa, 0.15 * Math.PI);
     moon.position.set(-20, 12, 5); moon.castShadow = true;
     moon.shadow.mapSize.set(1024, 1024);
     Object.assign(moon.shadow.camera, { near: 1, far: 50, left: -20, right: 20, top: 16, bottom: -2 });

@@ -238,12 +238,12 @@ export function Kitchen() {
     ch.position.set(-3.8,0,-2.2);ch.rotation.y=-.3;p.add(ch);
 
     // LIGHTING
-    p.add(new THREE.AmbientLight(0x7a8a82, 1.5 * Math.PI));
-    const f1=new THREE.PointLight(0xffaa55, 2.2 * 250, 30);f1.position.set(0,RH-1,0);p.add(f1);
-    const f2=new THREE.PointLight(0xffaa55, 1.5 * 250, 25);f2.position.set(-4,5,2);p.add(f2);
-    const f3=new THREE.PointLight(0xffaa55, 1.5 * 250, 25);f3.position.set(4,5,2);p.add(f3);
-    const f4=new THREE.PointLight(0xff8844, 1.5 * 250, 20);f4.position.set(0,3,4);p.add(f4);
-    const cF=new THREE.DirectionalLight(0x6a8a7a, 1.0 * Math.PI);cF.position.set(0,8,10);p.add(cF);
+    p.add(new THREE.AmbientLight(0x3a4a42, 0.5 * Math.PI));
+    const f1=new THREE.PointLight(0xffaa55, 2.2 * 100, 20);f1.position.set(0,RH-1,0);p.add(f1);
+    const f2=new THREE.PointLight(0xffaa55, 1.5 * 100, 15);f2.position.set(-4,5,2);p.add(f2);
+    const f3=new THREE.PointLight(0xffaa55, 1.5 * 100, 15);f3.position.set(4,5,2);p.add(f3);
+    const f4=new THREE.PointLight(0xff8844, 1.0 * 100, 12);f4.position.set(0,3,4);p.add(f4);
+    const cF=new THREE.DirectionalLight(0x4a6a5a, 0.3 * Math.PI);cF.position.set(0,8,10);p.add(cF);
 
     return { group: p, fl };
   }, []);

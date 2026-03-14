@@ -197,7 +197,7 @@ export function Library() {
         const f=A(new THREE.SphereGeometry(.018,3,3),glow(C.candle),x+(Math.random()-.5)*.1,y+h+.015,z+(Math.random()-.5)*.1,0,0,0,1,1.5,1);
         fl.push({flame:f,idx:50+i+x*3});
       }
-      const l=new THREE.PointLight(0xff8822, 1.5 * 200, 10);l.position.set(x,y+.3,z);p.add(l);
+      const l=new THREE.PointLight(0xff8822, 1 * 100, 5);l.position.set(x,y+.3,z);p.add(l);
     }
     mkCandles(-4.5,0,2.5,3);mkCandles(4.5,0,2.5,3);
     mkCandles(-4,0,-3,2);mkCandles(4,0,-3,2);
@@ -227,14 +227,14 @@ export function Library() {
     makeTorch(p,fl,3,4,-RD/2+.5,0,C.ir);
 
     // LIGHTING
-    p.add(new THREE.AmbientLight(0x2a334a, 1.5 * Math.PI));
-    const centerL = new THREE.PointLight(0xaa6644, 2 * 250, 25);
+    p.add(new THREE.AmbientLight(0x1a2233, 0.4 * Math.PI));
+    const centerL = new THREE.PointLight(0xaa6644, 2 * 100, 15);
     centerL.position.set(0, 4, 0); centerL.castShadow = true; p.add(centerL);
-    fl.push({ light: centerL, baseIntensity: 2 * 250, idx: 54 });
-    const cool=new THREE.DirectionalLight(0x5566cc, 0.8 * Math.PI);cool.position.set(0,12,0);p.add(cool);
-    const upL = new THREE.PointLight(C.crystal, 2.0 * 250, 15);
+    fl.push({ light: centerL, baseIntensity: 2 * 100, idx: 54 });
+    const cool=new THREE.DirectionalLight(0x3344aa, 0.15 * Math.PI);cool.position.set(0,12,0);p.add(cool);
+    const upL = new THREE.PointLight(C.crystal, 1.5 * 100, 8);
     upL.position.set(0, 1, 0); p.add(upL);
-    fl.push({ light: upL, baseIntensity: 2.0 * 250, idx: 105 });
+    fl.push({ light: upL, baseIntensity: 1.5 * 100, idx: 105 });
 
     return { group: p, fl };
   }, []);

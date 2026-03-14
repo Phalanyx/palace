@@ -72,7 +72,7 @@ export function makeTorch(
   addMesh(new THREE.CylinderGeometry(0.05, 0.07, 0.7, 5), mat(0x2a1e14), 0, 0.45, 0, 0, 0, 0, 1, 1, 1, g);
   const flame = addMesh(new THREE.SphereGeometry(0.12, 4, 4), glow(0xff9933), 0, 0.9, 0, 0, 0, 0, 1, 1.6, 1, g);
   g.position.set(x, y, z); g.rotation.y = ry; parent.add(g);
-  const tl = new THREE.PointLight(0xff8822, 1.5 * 200, 15);
+  const tl = new THREE.PointLight(0xff8822, 1.5 * 100, 9);
   tl.position.set(x, y + 1.1, z); tl.castShadow = true; parent.add(tl);
-  fl.push({ flame, light: tl, baseIntensity: 1.5 * 200, idx: Math.random() * 20 });
+  fl.push({ flame, light: tl, baseIntensity: 1.5 * 100, idx: Math.random() * 20 });
 }
