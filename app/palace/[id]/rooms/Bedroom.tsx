@@ -14,7 +14,7 @@ const BEDROOM_SLOTS: [number, number, number][] = [
 ];
 
 export function Bedroom({ objects = [], activeObjectIdx = -1, onCloseObject, onObjectOpen, onObjectClose, mode = 'learn' }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void; onObjectOpen?: (id: string) => void; onObjectClose?: (id: string) => void; mode?: 'learn' | 'test' }) {
-  const { group, candles, torches } = useMemo(() => {
+  const { group, flickerLights } = useMemo(() => {
     const parent = new THREE.Group();
     const candlesList: any[] = [];
     const torchesList: any[] = [];
@@ -160,10 +160,10 @@ export function Bedroom({ objects = [], activeObjectIdx = -1, onCloseObject, onO
       const flame = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshBasicMaterial({ color: C.candle }));
       flame.position.y = 0.15 + tall + 0.05; flame.scale.y = 1.5; g.add(flame);
       g.position.set(x, y, z); parent.add(g);
-      const pl = new THREE.PointLight(0xffaa44, 0.8, 6);
+      const pl = new THREE.PointLight(0xffaa44, 0.8 * 100, 6);
       pl.position.copy(flame.position); pl.position.set(x, y + 0.15 + tall + 0.1, z);
       pl.castShadow = true; parent.add(pl);
-      candlesList.push({ flame, light: pl });
+      candlesList.push({ flame, light: pl, baseIntensity: 0.8 * 100, idx: Math.random() * 20 });
     }
     makeCandle(-4.5, 1.5, -3, 0.5); makeCandle(1.5, 1.5, -3, 0.6);
 
@@ -244,10 +244,6 @@ export function Bedroom({ objects = [], activeObjectIdx = -1, onCloseObject, onO
       tl.position.set(x, y + 1.2, z); tl.castShadow = true; parent.add(tl);
       torchesList.push({ flame, light: tl, baseIntensity: 1.2 * 100, idx: Math.random() * 20 });
     }
-    // Fireplace light
-    const fpLight = new THREE.PointLight(0xff6622, 1.5 * 100, 10);
-    fpLight.position.set(-6, 1, 3); fpLight.castShadow = true; parent.add(fpLight);
-    torchesList.push({ light: fpLight, baseIntensity: 1.5 * 100, idx: 7 });
     makeTorch(-6.5, 4, -2); makeTorch(-6.5, 4, 3);
 
     // TAPESTRY / ARMOR
@@ -284,23 +280,11 @@ export function Bedroom({ objects = [], activeObjectIdx = -1, onCloseObject, onO
     windowLight.position.set(0, 6, -5.5); windowLight.target.position.set(0, 0, 2);
     parent.add(windowLight); parent.add(windowLight.target);
 
-    return { group: parent, candles: candlesList, torches: torchesList };
+    return { group: parent, flickerLights: [...candlesList, ...torchesList] };
   }, []);
 
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    candles.forEach((c: any, i: number) => {
-      c.light.intensity = 0.6 + Math.sin(t * 8 + i * 2) * 0.15 + Math.sin(t * 13 + i) * 0.1;
-      c.flame.scale.y = 1.3 + Math.sin(t * 10 + i) * 0.3;
-      c.flame.scale.x = 1 + Math.sin(t * 7 + i * 3) * 0.15;
-    });
-    torches.forEach((tc: any, i: number) => {
-      tc.light.intensity = 1 + Math.sin(t * 6 + i * 4) * 0.3 + Math.sin(t * 11 + i * 2) * 0.15;
-      if (tc.flame) {
-        tc.flame.scale.y = 1.6 + Math.sin(t * 9 + i * 2) * 0.4;
-        tc.flame.scale.x = 1 + Math.sin(t * 8 + i) * 0.2;
-      }
-    });
+    animateFlicker(flickerLights as FlickerItem[], clock.getElapsedTime());
   });
 
   return (

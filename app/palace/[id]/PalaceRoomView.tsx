@@ -11,6 +11,7 @@ import { Bedroom } from './rooms/Bedroom';
 import { GreatHall } from './rooms/GreatHall';
 import { Kitchen } from './rooms/Kitchen';
 import { Library as LibraryRoom } from './rooms/Library';
+import { Dungeon } from './rooms/Dungeon';
 
 interface RoomObject {
   id: string;
@@ -47,6 +48,7 @@ const ROOM_LABELS: Record<string, string> = {
   great_hall: '🏰 Great Hall',
   kitchen: '🍳 Kitchen',
   library: '📚 Library',
+  dungeon: '⛓️ Dungeon',
 };
 
 type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number; onCloseObject?: () => void; onObjectOpen?: (id: string) => void; onObjectClose?: (id: string) => void; mode?: 'learn' | 'test' }>;
@@ -56,13 +58,15 @@ const ROOM_COMPONENTS: Record<string, RoomFC> = {
   great_hall: GreatHall as RoomFC,
   kitchen: Kitchen as RoomFC,
   library: LibraryRoom as RoomFC,
+  dungeon: Dungeon as RoomFC,
 };
 
-const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: [number, number, number] }> = {
-  bedroom: { position: [8, 6, 10], target: [0, 3, 0] },
-  great_hall: { position: [0, 12, 26], target: [0, 4, -1] },
-  kitchen: { position: [0, 7, 12], target: [0, 3.5, 0] },
-  library: { position: [0, 8, 14], target: [0, 4, 1] },
+const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: [number, number, number]; exposure: number }> = {
+  bedroom: { position: [8, 6, 10], target: [0, 3, 0], exposure: 0.9 },
+  great_hall: { position: [0, 12, 26], target: [0, 4, -1], exposure: 0.85 },
+  kitchen: { position: [0, 7, 12], target: [0, 3.5, 0], exposure: 1.2 },
+  library: { position: [0, 8, 14], target: [0, 4, 1], exposure: 1.0 },
+  dungeon: { position: [0, 6, 14], target: [0, 2.8, 0], exposure: 1.15 },
 };
 
 // Per-room orbit constraints — tuned to each room's size so the camera
@@ -76,6 +80,7 @@ const ROOM_ORBIT: Record<string, {
   great_hall: { minDistance: 8,  maxDistance: 30, minPolar: 0.4, maxPolar: Math.PI / 2.2, minAzimuth: -Math.PI / 3, maxAzimuth: Math.PI / 3 },
   kitchen:    { minDistance: 6,  maxDistance: 20, minPolar: 0.5, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 4, maxAzimuth: Math.PI / 4 },
   library:    { minDistance: 7,  maxDistance: 24, minPolar: 0.45, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 3.5, maxAzimuth: Math.PI / 3.5 },
+  dungeon:    { minDistance: 5,  maxDistance: 18, minPolar: 0.5, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 3, maxAzimuth: Math.PI / 3 },
 };
 
 const ROOM_SLOTS: Record<string, [number, number, number][]> = {
@@ -90,6 +95,9 @@ const ROOM_SLOTS: Record<string, [number, number, number][]> = {
   ],
   library: [
     [0, 4.5, 4], [-6, 8.5, 2], [6, 8.5, 2], [-2.5, 2.5, 4], [2.5, 2.5, 4],
+  ],
+  dungeon: [
+    [-2, 3.5, 0.5], [-4.5, 3, -3.5], [4.5, 3, -3.5], [0, 4.5, -4.3], [3.5, 4.5, 2],
   ],
 };
 
@@ -277,7 +285,7 @@ export default function PalaceRoomView({
         key={activeRoom?.roomKey}
         shadows
         camera={{ position: cameraConfig?.position || [12, 10, 14], fov: 50, near: 0.1, far: 200 }}
-        gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 1.2 }}
+        gl={{ antialias: true, toneMapping: 4, toneMappingExposure: cameraConfig?.exposure ?? 1.0 }}
         style={{ width: '100%', height: '100%' }}
       >
         <Suspense fallback={null}>

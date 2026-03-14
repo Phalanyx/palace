@@ -65,14 +65,15 @@ export function animateFlicker(fl: FlickerItem[], t: number) {
 
 export function makeTorch(
   parent: THREE.Object3D, fl: FlickerItem[],
-  x: number, y: number, z: number, ry = 0, ironColor = 0x2e3034
+  x: number, y: number, z: number, ry = 0, ironColor = 0x2e3034,
+  lightIntensity = 1.5 * 100, lightRange = 9
 ) {
   const g = new THREE.Group();
   addMesh(jitter(new THREE.BoxGeometry(0.15, 0.4, 0.25, 1, 2, 1), 0.02), matMetal(ironColor), 0, 0, 0, 0, 0, 0, 1, 1, 1, g);
   addMesh(new THREE.CylinderGeometry(0.05, 0.07, 0.7, 5), mat(0x2a1e14), 0, 0.45, 0, 0, 0, 0, 1, 1, 1, g);
   const flame = addMesh(new THREE.SphereGeometry(0.12, 4, 4), glow(0xff9933), 0, 0.9, 0, 0, 0, 0, 1, 1.6, 1, g);
   g.position.set(x, y, z); g.rotation.y = ry; parent.add(g);
-  const tl = new THREE.PointLight(0xff8822, 1.5 * 100, 9);
+  const tl = new THREE.PointLight(0xff8822, lightIntensity, lightRange);
   tl.position.set(x, y + 1.1, z); tl.castShadow = true; parent.add(tl);
-  fl.push({ flame, light: tl, baseIntensity: 1.5 * 100, idx: Math.random() * 20 });
+  fl.push({ flame, light: tl, baseIntensity: lightIntensity, idx: Math.random() * 20 });
 }

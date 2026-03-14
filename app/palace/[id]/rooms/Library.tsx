@@ -154,7 +154,7 @@ export function Library({ objects = [], activeObjectIdx = -1, onCloseObject, onO
     A(jitter(new THREE.BoxGeometry(.7,.15,.7),.02),mat(C.sM),0,2.15,0,0,Math.PI/4,0,1,1,1,arch);
 
     // CRYSTAL
-    const crystalMat=new THREE.MeshStandardMaterial({color:C.crystal,flatShading:true,roughness:.1,metalness:.3,transparent:true,opacity:.8,emissive:C.crystalGlow,emissiveIntensity:.5});
+    const crystalMat=new THREE.MeshStandardMaterial({color:C.crystal,flatShading:true,roughness:.1,metalness:.3,transparent:true,opacity:.8,emissive:C.crystalGlow,emissiveIntensity:2.2});
     const crys=A(jitter(new THREE.OctahedronGeometry(0.7,0),.05),crystalMat,0,3.2,0,0,0,0,1,1,1,arch);
     (crys as any).__isCrystal = true;
     const crystInner=A(new THREE.OctahedronGeometry(.5,0),glow(C.crystalL,.6),0,3.2,0,0,0,0,1,1,1,arch);
@@ -162,7 +162,9 @@ export function Library({ objects = [], activeObjectIdx = -1, onCloseObject, onO
 
     arch.position.set(0,0,0);p.add(arch);
 
-    const crystLight=new THREE.PointLight(C.crystal, 3, 12);crystLight.position.set(0,3.5,0);p.add(crystLight);
+    // Crystal lights (matching library.html)
+    const crystLight=new THREE.PointLight(0x88bbff, 6 * 100, 16);crystLight.position.set(0,3.8,0);p.add(crystLight);
+    const crystLight2=new THREE.PointLight(0x4488ff, 3 * 100, 8);crystLight2.position.set(0,2.2,0);p.add(crystLight2);
 
     // Small cyan orbs around archway
     for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;
@@ -206,7 +208,7 @@ export function Library({ objects = [], activeObjectIdx = -1, onCloseObject, onO
         const f=A(new THREE.SphereGeometry(.018,3,3),glow(C.candle),x+(Math.random()-.5)*.1,y+h+.015,z+(Math.random()-.5)*.1,0,0,0,1,1.5,1);
         fl.push({flame:f,idx:50+i+x*3});
       }
-      const l=new THREE.PointLight(0xff8822, 1 * 100, 5);l.position.set(x,y+.3,z);p.add(l);
+      const l=new THREE.PointLight(0xffaa44, 0.6 * 100, 4);l.position.set(x,y+.3,z);p.add(l);
     }
     mkCandles(-4.5,0,2.5,3);mkCandles(4.5,0,2.5,3);
     mkCandles(-4,0,-3,2);mkCandles(4,0,-3,2);
@@ -225,23 +227,31 @@ export function Library({ objects = [], activeObjectIdx = -1, onCloseObject, onO
       stairs.position.set(side*(RW/2-2.5),0,RD/2-1);p.add(stairs);
     }
 
-    // TORCHES
-    makeTorch(p,fl,-RW/2+.5,5,-4,Math.PI/2,C.ir);
-    makeTorch(p,fl,-RW/2+.5,5,4,Math.PI/2,C.ir);
-    makeTorch(p,fl,RW/2-.5,5,-4,-Math.PI/2,C.ir);
-    makeTorch(p,fl,RW/2-.5,5,4,-Math.PI/2,C.ir);
-    makeTorch(p,fl,-RW/2+.5,8.5,0,Math.PI/2,C.ir);
-    makeTorch(p,fl,RW/2-.5,8.5,0,-Math.PI/2,C.ir);
-    makeTorch(p,fl,-3,4,-RD/2+.5,0,C.ir);
-    makeTorch(p,fl,3,4,-RD/2+.5,0,C.ir);
+    // TORCHES (library torches are dimmer than other rooms: 0.8*100 intensity, range 6)
+    const tI = 0.8 * 100, tR = 6;
+    makeTorch(p,fl,-RW/2+.5,5,-4,Math.PI/2,C.ir,tI,tR);
+    makeTorch(p,fl,-RW/2+.5,5,4,Math.PI/2,C.ir,tI,tR);
+    makeTorch(p,fl,RW/2-.5,5,-4,-Math.PI/2,C.ir,tI,tR);
+    makeTorch(p,fl,RW/2-.5,5,4,-Math.PI/2,C.ir,tI,tR);
+    makeTorch(p,fl,-RW/2+.5,8.5,0,Math.PI/2,C.ir,tI,tR);
+    makeTorch(p,fl,RW/2-.5,8.5,0,-Math.PI/2,C.ir,tI,tR);
+    makeTorch(p,fl,-3,4,-RD/2+.5,0,C.ir,tI,tR);
+    makeTorch(p,fl,3,4,-RD/2+.5,0,C.ir,tI,tR);
 
-    // LIGHTING
-    p.add(new THREE.AmbientLight(0x1a2233, 0.4 * Math.PI));
-    const centerL = new THREE.PointLight(0xaa6644, 2 * 100, 15);
-    centerL.position.set(0, 4, 0); centerL.castShadow = true; p.add(centerL);
-    fl.push({ light: centerL, baseIntensity: 2 * 100, idx: 54 });
+    // LIGHTING (matching library.html values)
+    p.add(new THREE.AmbientLight(0x1a1520, 0.35 * Math.PI));
+    // Overhead warm fill
+    const centerL = new THREE.PointLight(0xffaa55, 1 * 100, 18);
+    centerL.position.set(0, RH - 1, 0); centerL.castShadow = true; p.add(centerL);
+    // Side fill lights
+    const sf1 = new THREE.PointLight(0xff8844, 0.6 * 100, 10);
+    sf1.position.set(-6, 3, 0); p.add(sf1);
+    const sf2 = new THREE.PointLight(0xff8844, 0.6 * 100, 10);
+    sf2.position.set(6, 3, 0); p.add(sf2);
+    // Cool directional
     const cool=new THREE.DirectionalLight(0x3344aa, 0.15 * Math.PI);cool.position.set(0,12,0);p.add(cool);
-    const upL = new THREE.PointLight(C.crystal, 1.5 * 100, 8);
+    // Crystal uplighting
+    const upL = new THREE.PointLight(0x66aaff, 2.5 * 100, 10);
     upL.position.set(0, 1, 0); p.add(upL);
     fl.push({ light: upL, baseIntensity: 1.5 * 100, idx: 105 });
 
@@ -257,13 +267,14 @@ export function Library({ objects = [], activeObjectIdx = -1, onCloseObject, onO
         child.rotation.y = t * .3;
         child.rotation.x = Math.sin(t * .5) * .1;
         const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial;
-        m.emissiveIntensity = .3 + (.7 + Math.sin(t * 2) * .3) * .3;
+        const pulse = .5 + .5 * Math.sin(t * 2);
+        m.emissiveIntensity = 1.2 + pulse * 1.5;
       }
       if ((child as any).__isCrystalInner) {
         child.rotation.y = -t * .5;
         child.rotation.z = t * .2;
         const m = (child as THREE.Mesh).material as THREE.MeshBasicMaterial;
-        m.opacity = .4 + (.7 + Math.sin(t * 2) * .3) * .2;
+        m.opacity = .4 + (.5 + .5 * Math.sin(t * 2)) * .3;
       }
     });
   });

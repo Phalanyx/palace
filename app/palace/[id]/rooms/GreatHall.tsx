@@ -515,18 +515,7 @@ export function GreatHall({ objects = [], activeObjectIdx = -1, onCloseObject, o
   }, []);
 
   useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    flickerLights.forEach((f: any) => {
-      const n = f.idx || 0;
-      if (f.light) {
-        const b = f.baseIntensity || 1;
-        f.light.intensity = b + Math.sin(t * 7 + n) * b * 0.15 + Math.sin(t * 13 + n * 2) * b * 0.1;
-      }
-      if (f.flame) {
-        f.flame.scale.y = 1.5 + Math.sin(t * 9 + n) * 0.35;
-        f.flame.scale.x = 1 + Math.sin(t * 7 + n * 3) * 0.2;
-      }
-    });
+    animateFlicker(flickerLights as FlickerItem[], clock.getElapsedTime());
   });
 
   return (

@@ -134,8 +134,8 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
     >
       <primitive object={generatedObject} castShadow scale={[0.6, 0.6, 0.6]} />
 
-      {/* Point light so it glows into the room */}
-      <pointLight color={accentColor} intensity={20} distance={4} />
+      {/* Subtle glow — keep dim so it doesn't overpower room lighting */}
+      <pointLight color={accentColor} intensity={3} distance={3} />
 
       {/* Click popup */}
       {isOpen && (
