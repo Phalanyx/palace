@@ -103,34 +103,34 @@ COLOR RULES — pick from these neons, different color per part:
 
 WORKED EXAMPLES:
 
-Broken Compass (lost direction):
-[{"primitive":"octahedron","color":"#00ffff","position":[0,0,0],"scale":[1.6,0.4,1.6]},{"primitive":"cylinder","color":"#ff00ff","position":[0,0.5,0],"scale":[0.1,1.2,0.1]},{"primitive":"cone","color":"#ccff00","position":[0.3,0.5,0],"scale":[0.3,0.5,0.3]}]
+Book (knowledge):
+[{"primitive":"box","color":"#ff6600","position":[0,0,0],"scale":[1.4,1.8,0.3]},{"primitive":"box","color":"#00ffff","position":[0,0,0.2],"scale":[1.3,1.7,0.05]},{"primitive":"box","color":"#ccff00","position":[-0.7,0,0],"scale":[0.08,1.8,0.4]}]
 
-Lightning Rod (electrical force):
-[{"primitive":"cylinder","color":"#ccff00","position":[0,0,0],"scale":[0.15,2.0,0.15]},{"primitive":"cone","color":"#ff6600","position":[0,1.2,0],"scale":[0.3,0.6,0.3]},{"primitive":"sphere","color":"#ff00ff","position":[0,-1.0,0],"scale":[0.5,0.5,0.5]}]
+Telescope (exploration):
+[{"primitive":"cylinder","color":"#00ffff","position":[0,0,0],"scale":[0.4,2.0,0.4]},{"primitive":"cylinder","color":"#ff00ff","position":[0,1.1,0],"scale":[0.55,0.6,0.55]},{"primitive":"torus","color":"#ccff00","position":[0,1.4,0],"scale":[0.55,0.55,0.1]}]
 
-Balance Scale (equilibrium):
-[{"primitive":"box","color":"#ff6600","position":[0,0.6,0],"scale":[2.0,0.1,0.3]},{"primitive":"cylinder","color":"#00ffff","position":[0,-0.2,0],"scale":[0.15,1.4,0.15]},{"primitive":"cylinder","color":"#ff00ff","position":[-0.8,0.2,0],"scale":[0.5,0.15,0.5]},{"primitive":"cylinder","color":"#ccff00","position":[0.8,0.2,0],"scale":[0.5,0.15,0.5]}]
+Anchor (stability):
+[{"primitive":"cylinder","color":"#00ffff","position":[0,0.3,0],"scale":[0.15,1.8,0.15]},{"primitive":"torus","color":"#ff00ff","position":[0,1.2,0],"scale":[0.4,0.4,0.4]},{"primitive":"box","color":"#ff6600","position":[0,-0.6,0],"scale":[1.4,0.15,0.15]},{"primitive":"cone","color":"#ccff00","position":[-0.6,-0.8,0],"scale":[0.25,0.5,0.25]},{"primitive":"cone","color":"#ccff00","position":[0.6,-0.8,0],"scale":[0.25,0.5,0.25]}]
 
-Warped Hourglass (time distortion):
-[{"primitive":"cone","color":"#ff00ff","position":[0,0.7,0],"scale":[0.9,1.0,0.9]},{"primitive":"cone","color":"#00ffff","position":[0,-0.7,0],"scale":[0.7,1.4,0.7]},{"primitive":"cylinder","color":"#ccff00","position":[0,0,0],"scale":[0.2,0.3,0.2]}]
+Airplane (flight):
+[{"primitive":"cylinder","color":"#ff00ff","position":[0,0,0],"scale":[0.35,2.0,0.35]},{"primitive":"box","color":"#00ffff","position":[0,0,0],"scale":[2.0,0.08,0.5]},{"primitive":"box","color":"#ccff00","position":[0,-0.8,0],"scale":[0.8,0.08,0.3]},{"primitive":"cone","color":"#ff6600","position":[0,1.2,0],"scale":[0.3,0.5,0.3]}]
 
-Shattered Orb (entropy):
-[{"primitive":"sphere","color":"#ff0088","position":[0,0,0],"scale":[1.0,1.0,1.0]},{"primitive":"icosahedron","color":"#00ffff","position":[0.8,0.5,0],"scale":[0.4,0.4,0.4]},{"primitive":"icosahedron","color":"#ccff00","position":[-0.6,-0.4,0.5],"scale":[0.35,0.35,0.35]},{"primitive":"icosahedron","color":"#ff6600","position":[0,-0.6,-0.7],"scale":[0.45,0.45,0.45]}]
+Popcorn (burst of ideas):
+[{"primitive":"sphere","color":"#ffff00","position":[0,0.3,0],"scale":[0.6,0.6,0.6]},{"primitive":"sphere","color":"#ff6600","position":[0.4,0.6,0.2],"scale":[0.5,0.5,0.5]},{"primitive":"sphere","color":"#ccff00","position":[-0.3,0.7,-0.1],"scale":[0.45,0.45,0.45]},{"primitive":"cylinder","color":"#ff0088","position":[0,-0.5,0],"scale":[0.6,0.8,0.6]},{"primitive":"cone","color":"#ff00ff","position":[0,-1.0,0],"scale":[0.7,0.3,0.7]}]
 
-Double Helix (intertwined strands):
-[{"primitive":"torus","color":"#ff00ff","position":[0,0.4,0],"scale":[0.8,0.8,0.8]},{"primitive":"torus","color":"#00ff88","position":[0,-0.4,0],"scale":[0.8,0.8,0.8]},{"primitive":"cylinder","color":"#ccff00","position":[0,0,0],"scale":[0.12,1.8,0.12]}]
+Umbrella (protection):
+[{"primitive":"sphere","color":"#ff0088","position":[0,0.6,0],"scale":[1.6,0.6,1.6]},{"primitive":"cylinder","color":"#00ffff","position":[0,-0.3,0],"scale":[0.1,1.8,0.1]},{"primitive":"cone","color":"#ccff00","position":[0,-1.2,0],"scale":[0.2,0.3,0.2]}]
 
-Broken Column (collapse):
-[{"primitive":"cylinder","color":"#00ffff","position":[0,0.3,0],"scale":[0.7,1.6,0.7]},{"primitive":"box","color":"#ff6600","position":[0.5,-0.8,0.3],"scale":[0.5,0.4,0.4]},{"primitive":"box","color":"#ff00ff","position":[-0.3,-0.9,-0.2],"scale":[0.4,0.35,0.45]}]
+Lighthouse (guidance):
+[{"primitive":"cylinder","color":"#00ffff","position":[0,0,0],"scale":[0.6,1.8,0.6]},{"primitive":"cone","color":"#ff6600","position":[0,1.2,0],"scale":[0.7,0.6,0.7]},{"primitive":"sphere","color":"#ffff00","position":[0,1.5,0],"scale":[0.4,0.4,0.4]}]
 
-Twin-Edged Dagger (duality):
-[{"primitive":"box","color":"#ff0088","position":[0,0.6,0],"scale":[0.2,1.8,0.08]},{"primitive":"box","color":"#00ffff","position":[0,-0.2,0],"scale":[0.8,0.15,0.15]},{"primitive":"sphere","color":"#ccff00","position":[0,-0.6,0],"scale":[0.3,0.3,0.3]}]
+Trophy (achievement):
+[{"primitive":"cylinder","color":"#ffff00","position":[0,0.5,0],"scale":[0.8,0.8,0.8]},{"primitive":"cylinder","color":"#ff6600","position":[0,-0.2,0],"scale":[0.15,0.8,0.15]},{"primitive":"cylinder","color":"#00ffff","position":[0,-0.7,0],"scale":[0.6,0.15,0.6]},{"primitive":"torus","color":"#ff00ff","position":[0,0.9,0],"scale":[0.5,0.5,0.1]}]
 
-Sun Crystal (radiant energy):
-[{"primitive":"icosahedron","color":"#ffff00","position":[0,0,0],"scale":[1.4,1.4,1.4]},{"primitive":"cone","color":"#ff6600","position":[0,1.0,0],"scale":[0.3,0.5,0.3]},{"primitive":"cone","color":"#ff6600","position":[0.8,0,0],"scale":[0.3,0.5,0.3]},{"primitive":"cone","color":"#ff6600","position":[-0.8,0,0],"scale":[0.3,0.5,0.3]}]
+Mushroom (growth):
+[{"primitive":"sphere","color":"#ff0088","position":[0,0.5,0],"scale":[1.4,0.8,1.4]},{"primitive":"cylinder","color":"#00ff88","position":[0,-0.3,0],"scale":[0.35,1.2,0.35]},{"primitive":"torus","color":"#ccff00","position":[0,0.1,0],"scale":[0.5,0.5,0.1]}]
 
-NOW GENERATE for each item below:
+NOW GENERATE for each item below, using the examples above AS REFERENCE ONLY, PLEASE COME UP WITH BETTER ITEMS GIVEN THE PROMPT:
 
 Items:
 ${itemList}` }]
