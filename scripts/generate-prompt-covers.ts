@@ -5,12 +5,10 @@
  * Usage:  npx tsx scripts/generate-prompt-covers.ts
  */
 import 'dotenv/config'
-import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { PROMPT_LIBRARY } from '../lib/promptLibrary'
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
+import { ai } from '../lib/gemini'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

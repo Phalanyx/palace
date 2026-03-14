@@ -1,11 +1,10 @@
-import { GoogleGenAI, Type } from "@google/genai"
+import { Type } from "@google/genai"
+import { ai } from "./gemini"
 import * as THREE from "three"
 
 export interface GeneratedMesh {
   code: string;
 }
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })
 
 const FALLBACK_CODE = `
   const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -26,30 +25,31 @@ async function generateSingleMesh(
   const maxRetries = 3;
   let previousErrors = "";
 
-  const basePrompt = `You are a 3D artist building a memory palace — a mnemonic learning tool where physical objects help someone REMEMBER academic concepts. Your job: write raw JavaScript (for Three.js) that returns a THREE.Object3D.
+  const basePrompt = `You are a Master 3D Artist and Three.js Expert. Your task is to generate a STANDALONE PREVIEW HTML FILE for a 3D mnemonic object.
 
-THE CONCEPT TO REMEMBER:
+OBJECT TO REPRESENT:
 "${obj.label}" — ${obj.description}
 
-THE PHYSICAL OBJECT CHOSEN AS A METAPHOR: "${obj.itemType}"
+PHYSICAL METAPHOR: "${obj.itemType}"
 
-YOUR CREATIVE GOAL:
-A person walks into a 3D room and sees this object. They should IMMEDIATELY think: "Ah, that's about ${obj.label}!"
-Think about WHY "${obj.itemType}" represents "${obj.label}". What visual features of a ${obj.itemType} echo the concept? Lean into those features:
-- If the metaphor is about STRUCTURE (e.g. a Zipper for DNA Replication), emphasize the interlocking/parallel structure.
-- If the metaphor is about TRANSFORMATION (e.g. a Cocoon for Metamorphosis), show the transitional form.
-- If the metaphor is about FLOW or DIRECTION (e.g. a Funnel for Data Pipeline), make the directional shape clear.
-- If the metaphor is about BALANCE or TENSION (e.g. a Scale for Supply & Demand), show opposing forces.
-Build a recognizable, detailed silhouette of "${obj.itemType}" — not a generic blob. Use multiple parts in a THREE.Group to capture the distinct features (handle, blade, pages, teeth, petals, etc.).
+DESIGN REQUIREMENTS:
+1. AESTHETIC: High-end LOW-POLY / NEON style. Flat shading is mandatory.
+2. GEOMETRY: Use sophisticated Three.js techniques (LatheGeometry, ExtrudeGeometry with custom shapes, TubeGeometry, or complex Boolean-like assemblies). NO BLABS. The silhouette must be sharp and recognizable.
+3. SEGMENTS: For all curved geometries, use 3-8 radial segments.
+4. MATERIALS: MeshPhysicalMaterial with neon emissive colors (emissiveIntensity: 2.5).
+5. COLORS: Pick from {0xff00ff, 0x00ffff, 0xccff00, 0xff6600, 0x00ff88, 0xff0088, 0xaa00ff, 0xffff00}.
 
-THREE.JS RULES:
-1. \`THREE\` is a global. Do NOT import/require anything.
-2. Low-poly aesthetic: use low segment counts (3-8) on all circular geometries. Always set \`flatShading: true\` on materials.
-3. Use \`THREE.MeshPhysicalMaterial\` with neon emissive glow (emissiveIntensity ~2.0-3.0). Pick colors that feel thematically right for the concept — warm tones for energy/life, cool tones for logic/structure, etc. Available neons: 0xff00ff, 0x00ffff, 0xccff00, 0xff6600, 0x00ff88, 0xff0088, 0xaa00ff, 0xffff00.
-4. Keep the object within a 1.5×1.5×1.5 bounding box centered at origin.
-5. Return ONLY raw JavaScript code — no markdown fences, no comments, no explanations. The code is executed directly via \`new Function('THREE', code)\`.
-6. The final line must be \`return group;\` or \`return mesh;\`.
-`;
+THE CONTRACT:
+Your response must be a COMPLETE, VALID HTML FILE that someone could open in a browser to see the model.
+CRITICAL: Inside the <script> block, you MUST define a global function:
+window.createMnemonicModel = function(THREE) {
+  // your construction logic here...
+  return groupOrMesh;
+};
+
+The HTML must also include a full setup (Scene, Camera, Renderer, OrbitControls via CDN, Lights) so the model is actually visible when opened.
+
+OUTPUT ONLY THE HTML CODE. No markdown fences.`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const prompt = previousErrors 
@@ -62,50 +62,30 @@ THREE.JS RULES:
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
       });
 
-      let code = response.text || "";
-      // Strip markdown if the LLM ignores instructions
-      if (code.startsWith("```javascript")) {
-        code = code.substring(13);
-        if (code.endsWith("```")) {
-           code = code.substring(0, code.length - 3);
-        }
-      } else if (code.startsWith("```js")) {
-        code = code.substring(5);
-        if (code.endsWith("```")) {
-           code = code.substring(0, code.length - 3);
-        }
-      } else if (code.startsWith("```")) {
-        code = code.substring(3);
-        if (code.endsWith("```")) {
-           code = code.substring(0, code.length - 3);
-        }
+      let html = response.text || "";
+      // Strip markdown
+      if (html.includes("```html")) {
+        html = html.split("```html")[1].split("```")[0];
+      } else if (html.includes("```")) {
+        html = html.split("```")[1].split("```")[0];
       }
-      code = code.trim();
+      html = html.trim();
 
-      // VALIDATION LOOP
-      try {
-        const createMeshFn = new Function('THREE', code);
-        const testObj = createMeshFn(THREE);
-        
-        if (!testObj || !(testObj instanceof THREE.Object3D)) {
-            throw new Error("The returned object is not a valid THREE.Object3D.");
-        }
-
-        console.log(`Successfully generated mesh for "${obj.label}" on attempt ${attempt}`);
-        return code; // Return the working code
-      } catch (execError: any) {
-        console.warn(`Execution failed for "${obj.label}" on attempt ${attempt}:`, execError.message);
-        previousErrors = execError.message;
-        // Proceed to next loop iteration
+      // VALIDATION: Check if createMnemonicModel exists in string
+      if (!html.includes("createMnemonicModel")) {
+         throw new Error("Missing 'createMnemonicModel' function in HTML.");
       }
-    } catch (apiError: any) {
-      console.warn(`Gemini API failed for "${obj.label}" on attempt ${attempt}:`, apiError.message);
-      // Let it naturally retry or return fallback
+
+      console.log(`Successfully generated HTML blueprint for "${obj.label}" on attempt ${attempt}`);
+      return html; 
+    } catch (err: any) {
+      console.warn(`Generation failed for "${obj.label}" on attempt ${attempt}:`, err.message);
+      previousErrors = err.message;
     }
   }
 
-  console.error(`All ${maxRetries} attempts failed for "${obj.label}". Using fallback.`);
-  return FALLBACK_CODE;
+  // Fallback to minimal HTML with the legacy FALLBACK_CODE behavior
+  return `<!DOCTYPE html><html><body><script>window.createMnemonicModel = function(THREE) { ${FALLBACK_CODE} };</script></body></html>`;
 }
 
 export async function generateAllMeshes(

@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { askMoorcheh } from '@/lib/moorcheh'
-import { GoogleGenerativeAI } from "@google/generative-ai"
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+import { ai } from '@/lib/gemini'
 
 export async function POST(request: Request, context: any) {
   try {
@@ -50,8 +48,6 @@ export async function POST(request: Request, context: any) {
     }
 
     // 2. Ask Gemini to Grade utilizing Moorcheh context and targetAnswer
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
-    
     const prompt = `
       You are an expert tutor grading a student's answer.
       
@@ -70,10 +66,13 @@ export async function POST(request: Request, context: any) {
       }
     `
 
-    const response = await model.generateContent(prompt)
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    })
     let evaluation
     try {
-      let cleanResponse = response.response.text()
+      let cleanResponse = response.text || ''
       if (cleanResponse.startsWith('```json')) {
           cleanResponse = cleanResponse.split('```json')[1].split('```')[0].trim()
       }

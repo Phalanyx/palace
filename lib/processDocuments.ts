@@ -1,14 +1,10 @@
-import { GoogleGenAI, Type } from "@google/genai"
+import { Type } from "@google/genai"
+import { ai } from "./gemini"
 import { prisma } from "./prisma"
 import { uploadToMoorcheh, createNamespace } from "./moorcheh"
 import { createClient } from '@supabase/supabase-js'
 import { generateAllMeshes } from "./meshGenerator"
 import sharp from 'sharp'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })
 
 const palaceSchema = {
   type: Type.ARRAY,
@@ -141,33 +137,22 @@ export async function processDocuments(palaceId: string) {
       }
       
       const buffer = Buffer.from(await data.arrayBuffer())
-      const tempFilePath = path.join(os.tmpdir(), `upload-${doc.id}-${doc.fileName}`)
-      fs.writeFileSync(tempFilePath, buffer)
+      const base64Data = buffer.toString('base64')
+      const mimeType = doc.fileType === 'pdf' ? 'application/pdf' :
+                       (doc.fileType === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 'text/plain')
 
-      console.log(`Uploading ${doc.fileName} to Gemini...`)
-      const uploadResult = await ai.files.upload({
-        file: tempFilePath,
-        config: {
-          mimeType: doc.fileType === 'pdf' ? 'application/pdf' : 
-                   (doc.fileType === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 'text/plain')
-        }
-      })
-      console.log(`Uploaded to Gemini as ${uploadResult.name}`)
+      console.log(`Processing ${doc.fileName} (${(buffer.length / 1024).toFixed(0)}KB, ${mimeType})...`)
 
       const transcriptionPrompt = "Extract and transcribe all the visible text content from this document from start to finish. Output ONLY the raw text without any markdown or formatting additions."
       const transcriptionResult = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [
-          { role: "user", parts: [{ text: transcriptionPrompt }, { fileData: { fileUri: uploadResult.uri, mimeType: uploadResult.mimeType } }] }
+          { role: "user", parts: [{ text: transcriptionPrompt }, { inlineData: { data: base64Data, mimeType } }] }
         ]
       })
 
       const text = transcriptionResult.text || ""
       combinedTextArray.push(`--- Document: ${doc.fileName} ---\n${text}`)
-
-      // Cleanup
-      fs.unlinkSync(tempFilePath)
-      await ai.files.delete({ name: uploadResult.name! })
 
       // Prepare chunks for Moorcheh (approx 2000 chars per chunk)
       const chunkSize = 2000
@@ -300,11 +285,11 @@ export async function processDocuments(palaceId: string) {
           const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff });
           return new THREE.Mesh(geometry, material);
         `;
-        const meshPath = `meshes/${palace.id}/${saved.dbId}.js`;
+        const meshPath = `meshes/${palace.id}/${saved.dbId}.html`;
 
         const { error: meshErr } = await supabase.storage
           .from('palace-models')
-          .upload(meshPath, scriptContent, { contentType: 'application/javascript', upsert: true })
+          .upload(meshPath, scriptContent, { contentType: 'text/html', upsert: true })
 
         if (meshErr) {
           console.error(`  Mesh upload failed for "${saved.label}": ${meshErr.message}`)

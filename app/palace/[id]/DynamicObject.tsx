@@ -49,16 +49,40 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
     // Prefer the proper Mesh DB relation, fall back to legacy metadata
     let meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
     
-    // Convert old .json URLs to .js for backwards/forwards compatibility transition if dealing with newly generated ones
-    if (meshUrl?.endsWith('.json')) {
-         meshUrl = meshUrl.slice(0, -5) + '.js'; 
-    }
+    // Support transition: check if URL refers to an .html blueprint
+    const isHtmlBlueprint = meshUrl?.endsWith('.html');
 
-    const buildMeshFromCode = (code: string) => {
+    const buildMeshFromCode = (codeOrHtml: string) => {
       try {
-        const createMeshFn = new Function('THREE', code);
-        const obj = createMeshFn(THREE);
+        let obj: THREE.Object3D | null = null;
         
+        if (isHtmlBlueprint || codeOrHtml.includes('createMnemonicModel')) {
+          // Extract script content from HTML
+          let scriptContent = codeOrHtml;
+          if (codeOrHtml.includes('<script>')) {
+            scriptContent = codeOrHtml.split('<script>')[1].split('</script>')[0];
+          }
+          
+          // Execute script in a sandbox to define the function
+          const sandbox: any = { createMnemonicModel: null };
+          const setupFn = new Function('THREE', 'window', scriptContent);
+          setupFn(THREE, sandbox);
+          
+          if (typeof sandbox.createMnemonicModel === 'function') {
+            obj = sandbox.createMnemonicModel(THREE);
+          } else if (typeof (window as any).createMnemonicModel === 'function') {
+            obj = (window as any).createMnemonicModel(THREE);
+          }
+        }
+
+        // Final fallback to raw eval if object wasn't built yet
+        if (!obj) {
+          const createMeshFn = new Function('THREE', codeOrHtml);
+          obj = createMeshFn(THREE);
+        }
+        
+        if (!obj) throw new Error("Could not instantiate object from blueprint.");
+
         // Attempt to extract an expressive color
         let foundColor = '#ff00ff'; // default neon
         obj.traverse((child: any) => {
@@ -70,7 +94,6 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
         setGeneratedObject(obj);
       } catch (e) {
         console.error("Failed to build mesh from code:", e);
-        // Fallback
         const fallbackFn = new Function('THREE', FALLBACK_CODE);
         setGeneratedObject(fallbackFn(THREE));
       }
@@ -83,17 +106,11 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
 
     fetch(meshUrl)
       .then(r => {
-          if (!r.ok) throw new Error("Could not fetch mesh JS code");
+          if (!r.ok) throw new Error("Could not fetch mesh asset");
           return r.text();
       })
       .then(text => {
-          // If we accidentally get old JSON with 'parts', try fallback
-          if (text.trim().startsWith('{')) {
-              console.warn("Got legacy JSON instead of JS code, applying fallback");
-              buildMeshFromCode(FALLBACK_CODE);
-          } else {
-              buildMeshFromCode(text);
-          }
+          buildMeshFromCode(text);
       })
       .catch((e) => {
           console.error(e);
