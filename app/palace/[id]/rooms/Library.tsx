@@ -7,8 +7,8 @@ import { DynamicObject } from '../DynamicObject';
 
 const LIBRARY_SLOTS: [number, number, number][] = [
   [0, 4.5, 4],         // Floating in front of the central monument
-  [-6, 7.5, 2],        // On the left mezzanine
-  [6, 7.5, 2],         // On the right mezzanine
+  [-6, 8.5, 2],        // On the left mezzanine
+  [6, 8.5, 2],         // On the right mezzanine
   [-2.5, 2.5, 4],      // On the left reading desk
   [2.5, 2.5, 4]        // On the right reading desk
 ];
