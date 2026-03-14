@@ -111,9 +111,17 @@ export default async function PalacePage(props: { params: Promise<{ id: string }
                       </div>
                       <div>
                         <h3 className="font-bold text-xl text-indigo-950 capitalize">{obj.label}</h3>
-                        <p className="text-indigo-600/80 text-base leading-snug line-clamp-2">
+                        <p className="text-indigo-600/80 text-base leading-snug">
                           {obj.description}
                         </p>
+                        {obj.sampleQuestion && (
+                          <div className="mt-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 flex gap-2 items-start opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-indigo-400 font-bold font-['Baloo_2']">Q:</span>
+                            <p className="text-sm font-medium text-indigo-700 leading-snug italic">
+                              {obj.sampleQuestion}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </li>
                   ))}

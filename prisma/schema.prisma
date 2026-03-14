@@ -47,7 +47,8 @@ model Object {
   description String   @db.Text
   modelKey    String   @map("model_key")  // book | scroll | crystal | orb | flask | key | coin | torch
   colorHint   String?  @map("color_hint")
-  orderIndex  Int      @map("order_index")
+  orderIndex     Int      @map("order_index")
+  sampleQuestion String?  @map("sample_question")
   metadata    Json?
   createdAt   DateTime @default(now()) @map("created_at")
 

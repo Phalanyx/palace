@@ -22,6 +22,7 @@ const objectSchema = {
       },
       color_hint: { type: Type.STRING, description: "e.g., 'deep blue', 'warm amber'" },
       order_index: { type: Type.INTEGER },
+      sample_question: { type: Type.STRING, description: "A test question evaluating the student's semantic understanding of this object's concept. E.g. 'What is the primary function of...'" },
       metadata: {
         type: Type.OBJECT,
         properties: {
@@ -31,7 +32,7 @@ const objectSchema = {
         }
       }
     },
-    required: ["label", "description", "model_key", "order_index"]
+    required: ["label", "description", "model_key", "order_index", "sample_question"]
   }
 }
 
@@ -148,6 +149,7 @@ export async function processDocuments(palaceId: string) {
       modelKey: obj.model_key,
       colorHint: obj.color_hint,
       orderIndex: obj.order_index,
+      sampleQuestion: obj.sample_question,
       metadata: obj.metadata
     }))
 
