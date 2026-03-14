@@ -296,8 +296,10 @@ export function Bedroom({ objects = [] }: { objects?: any[] }) {
     });
     torches.forEach((tc: any, i: number) => {
       tc.light.intensity = 1 + Math.sin(t * 6 + i * 4) * 0.3 + Math.sin(t * 11 + i * 2) * 0.15;
-      tc.flame.scale.y = 1.6 + Math.sin(t * 9 + i * 2) * 0.4;
-      tc.flame.scale.x = 1 + Math.sin(t * 8 + i) * 0.2;
+      if (tc.flame) {
+        tc.flame.scale.y = 1.6 + Math.sin(t * 9 + i * 2) * 0.4;
+        tc.flame.scale.x = 1 + Math.sin(t * 8 + i) * 0.2;
+      }
     });
   });
 
