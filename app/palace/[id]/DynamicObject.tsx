@@ -5,13 +5,6 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 
-interface MeshPart {
-  primitive: 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 'icosahedron' | 'octahedron';
-  color: string;
-  position: [number, number, number];
-  scale: [number, number, number];
-}
-
 interface DynamicObjectProps {
   objectData: {
     id: string;
@@ -25,70 +18,85 @@ interface DynamicObjectProps {
   position: [number, number, number];
   forceOpen?: boolean;
   onClose?: () => void;
+  mode?: 'learn' | 'test';
 }
 
-function PartMesh({ part }: { part: MeshPart }) {
-  const color = part.color || '#ff00ff';
-  const mat = (
-    <meshPhysicalMaterial
-      color={color}
-      emissive={color}
-      emissiveIntensity={2.5}
-      roughness={0.1}
-      metalness={0.7}
-    />
-  );
+const FALLBACK_CODE = `
+  const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+  const material = new THREE.MeshPhysicalMaterial({
+    color: 0xff00ff,
+    emissive: 0xff00ff,
+    emissiveIntensity: 2.5,
+    roughness: 0.1,
+    metalness: 0.7
+  });
+  return new THREE.Mesh(geometry, material);
+`;
 
-  const scale: [number, number, number] = [
-    part.scale?.[0] ?? 1,
-    part.scale?.[1] ?? 1,
-    part.scale?.[2] ?? 1,
-  ];
-
-  return (
-    <mesh position={part.position} scale={scale} castShadow>
-      {part.primitive === 'sphere' && <sphereGeometry args={[0.5, 24, 24]} />}
-      {part.primitive === 'cylinder' && <cylinderGeometry args={[0.3, 0.3, 1, 24]} />}
-      {part.primitive === 'cone' && <coneGeometry args={[0.5, 1, 24]} />}
-      {part.primitive === 'torus' && <torusGeometry args={[0.4, 0.14, 16, 60]} />}
-      {part.primitive === 'icosahedron' && <icosahedronGeometry args={[0.5, 0]} />}
-      {part.primitive === 'octahedron' && <octahedronGeometry args={[0.5, 0]} />}
-      {(part.primitive === 'box' || !part.primitive) && <boxGeometry args={[0.8, 0.8, 0.8]} />}
-      {mat}
-    </mesh>
-  );
-}
-
-const FALLBACK_PARTS: MeshPart[] = [
-  { primitive: 'sphere', color: '#ff00ff', position: [0, 0, 0], scale: [1, 1, 1] },
-];
-
-export function DynamicObject({ objectData, position, forceOpen = false, onClose }: DynamicObjectProps) {
+export function DynamicObject({ objectData, position, forceOpen = false, onClose, mode = 'learn' }: DynamicObjectProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHover] = useState(false);
   const [clicked, setClick] = useState(false);
-  const [parts, setParts] = useState<MeshPart[] | null>(null);
+  const [generatedObject, setGeneratedObject] = useState<THREE.Object3D | null>(null);
+  const [accentColor, setAccentColor] = useState('#ff00ff');
 
   const isOpen = forceOpen || clicked;
 
   // Fetch mesh definition from Supabase at mount time
   useEffect(() => {
     // Prefer the proper Mesh DB relation, fall back to legacy metadata
-    const meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
+    let meshUrl = objectData.mesh?.storageUrl ?? objectData.metadata?.meshUrl;
+    
+    // Convert old .json URLs to .js for backwards/forwards compatibility transition if dealing with newly generated ones
+    if (meshUrl?.endsWith('.json')) {
+         meshUrl = meshUrl.slice(0, -5) + '.js'; 
+    }
+
+    const buildMeshFromCode = (code: string) => {
+      try {
+        const createMeshFn = new Function('THREE', code);
+        const obj = createMeshFn(THREE);
+        
+        // Attempt to extract an expressive color
+        let foundColor = '#ff00ff'; // default neon
+        obj.traverse((child: any) => {
+          if (child.isMesh && child.material && child.material.color) {
+            foundColor = '#' + child.material.color.getHexString();
+          }
+        });
+        setAccentColor(foundColor);
+        setGeneratedObject(obj);
+      } catch (e) {
+        console.error("Failed to build mesh from code:", e);
+        // Fallback
+        const fallbackFn = new Function('THREE', FALLBACK_CODE);
+        setGeneratedObject(fallbackFn(THREE));
+      }
+    };
+
     if (!meshUrl) {
-      setParts(FALLBACK_PARTS);
+      buildMeshFromCode(FALLBACK_CODE);
       return;
     }
+
     fetch(meshUrl)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data.parts) && data.parts.length > 0) {
-          setParts(data.parts);
-        } else {
-          setParts(FALLBACK_PARTS);
-        }
+      .then(r => {
+          if (!r.ok) throw new Error("Could not fetch mesh JS code");
+          return r.text();
       })
-      .catch(() => setParts(FALLBACK_PARTS));
+      .then(text => {
+          // If we accidentally get old JSON with 'parts', try fallback
+          if (text.trim().startsWith('{')) {
+              console.warn("Got legacy JSON instead of JS code, applying fallback");
+              buildMeshFromCode(FALLBACK_CODE);
+          } else {
+              buildMeshFromCode(text);
+          }
+      })
+      .catch((e) => {
+          console.error(e);
+          buildMeshFromCode(FALLBACK_CODE);
+      });
   }, [objectData.mesh?.storageUrl, objectData.metadata?.meshUrl]);
 
   // Floating bob + slow rotation
@@ -104,7 +112,7 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
     );
   });
 
-  if (!parts) return null; // still loading
+  if (!generatedObject) return null; // still loading
 
   return (
     <group
@@ -114,10 +122,10 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
       onPointerOut={e => { e.stopPropagation(); setHover(false); document.body.style.cursor = 'auto'; }}
       onClick={e => { e.stopPropagation(); setClick(c => !c); }}
     >
-      {parts.map((p, i) => <PartMesh key={i} part={p} />)}
+      <primitive object={generatedObject} castShadow />
 
       {/* Point light so it glows into the room */}
-      <pointLight color={parts[0]?.color ?? '#ff00ff'} intensity={20} distance={4} />
+      <pointLight color={accentColor} intensity={20} distance={4} />
 
       {/* Click popup */}
       {isOpen && (
@@ -131,53 +139,40 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
             onClick={e => e.stopPropagation()}
             style={{
               background: 'rgba(10,10,20,0.92)',
-              border: `2px solid ${parts[0]?.color ?? '#ff00ff'}`,
+              border: `2px solid ${accentColor}`,
               borderRadius: '16px',
               padding: '14px 18px',
               width: '260px',
               color: '#fff',
               fontFamily: 'system-ui, sans-serif',
-              boxShadow: `0 0 24px ${parts[0]?.color ?? '#ff00ff'}88`,
+              boxShadow: `0 0 24px ${accentColor}88`,
               pointerEvents: 'auto',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <span style={{
-                background: parts[0]?.color ?? '#ff00ff',
+                background: accentColor,
                 color: '#000',
                 borderRadius: 6,
                 padding: '2px 8px',
                 fontSize: 11,
                 fontWeight: 700,
               }}>
-                {objectData.metadata?.itemType ?? objectData.label}
+                {mode === 'test' ? '❓ Question' : (objectData.metadata?.itemType ?? objectData.label)}
               </span>
               <button
                 onClick={() => { setClick(false); onClose?.(); }}
                 style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }}
               >✕</button>
             </div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: parts[0]?.color ?? '#ff00ff' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: accentColor }}>
               {objectData.label}
             </h3>
-            <p style={{ margin: '0 0 10px', fontSize: 12, lineHeight: 1.5, color: '#ccc' }}>
-              {objectData.description}
+            <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#ccc' }}>
+              {mode === 'test'
+                ? (objectData.sampleQuestion ?? objectData.description)
+                : objectData.description}
             </p>
-            {objectData.sampleQuestion && (
-              <div style={{
-                background: 'rgba(255,255,255,0.06)',
-                borderRadius: 10,
-                padding: '8px 10px',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}>
-                <p style={{ margin: '0 0 4px', fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Sample Question
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: '#e0e0e0', fontStyle: 'italic', lineHeight: 1.5 }}>
-                  {objectData.sampleQuestion}
-                </p>
-              </div>
-            )}
           </div>
         </Html>
       )}

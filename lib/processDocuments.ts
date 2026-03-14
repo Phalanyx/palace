@@ -26,7 +26,7 @@ const palaceSchema = {
           properties: {
             label: { type: Type.STRING, description: "Short concept name, max 4 words" },
             description: { type: Type.STRING, description: "2-3 sentence explanation" },
-            item_type: { type: Type.STRING, description: "A specific, evocative physical item that metaphorically represents this concept's meaning (e.g. 'Broken Compass' for lost direction, 'Cracked Hourglass' for time pressure, 'Twin-Edged Dagger' for duality). Must be UNIQUE across the entire palace — no two objects may share the same item type." },
+            item_type: { type: Type.STRING, description: "A single everyday physical object that serves as a visual metaphor for this concept (e.g. 'Airplane', 'Book', 'Telescope', 'Popcorn', 'Anchor', 'Umbrella'). Must be a REAL tangible thing you could hold or see — NOT an abstract phrase. Must be UNIQUE across the palace." },
             model_key: {
               type: Type.STRING,
               enum: ["book", "scroll", "crystal", "orb", "flask", "key", "coin", "torch"],
@@ -142,19 +142,25 @@ export async function processDocuments(palaceId: string) {
       Group related concepts into the same room thematically. Order objects within each room logically.
 
       ITEM SELECTION — this is the most important creative task:
-      For each concept, choose a UNIQUE physical item whose shape, nature, or symbolism reflects the concept's meaning.
+      For each concept, choose a UNIQUE everyday physical object whose shape or symbolism metaphorically reflects the concept.
+      The item_type must be a REAL, TANGIBLE thing you could hold, see, or touch — NOT an abstract phrase or concept.
       Ignore the room entirely when picking the item. Focus on the IDEA.
       Examples of concept → item mapping:
-      - "Natural Selection" → Cracked Fossil (icosahedron body + box slab base)
-      - "Supply & Demand" → Balance Scale (wide flat box beam + two cylinder pans hanging at ends)
-      - "Ohm's Law" → Lightning Rod (tall thin cylinder + cone tip + sphere base)
-      - "DNA Replication" → Double Helix (two intertwined torus rings + cylinder axis)
-      - "The Fall of Rome" → Broken Column (cylinder body + crumbled box chunks at y<0)
-      - "Photosynthesis" → Sun Crystal (icosahedron body + small cone rays around it)
-      - "Entropy" → Shattered Orb (central sphere + 3 small icosahedra offset outward)
-      - "Newton's First Law" → Iron Pendulum (sphere bob + thin cylinder rod)
-      - "Free Will" → Twin-Edged Dagger (tall thin box blade + flat box crossguard)
-      - "Time Dilation" → Warped Hourglass (two cones tip-to-tip, one stretched, cylinder waist)
+      - "Natural Selection" → Fossil
+      - "Supply & Demand" → Balance Scale
+      - "Ohm's Law" → Light Bulb
+      - "DNA Replication" → Zipper
+      - "The Fall of Rome" → Broken Pillar
+      - "Photosynthesis" → Sunflower
+      - "Entropy" → Melting Ice Cube
+      - "Newton's First Law" → Bowling Ball
+      - "Pilot Program" → Airplane
+      - "Data Pipeline" → Funnel
+      - "User Engagement" → Magnet
+      - "Market Growth" → Sprout
+
+      BAD item_types (NEVER do this): "Core CS Curriculum", "Automated Data Flow", "Digital Transformation", "System Architecture"
+      GOOD item_types: Book, Compass, Anchor, Rocket, Hourglass, Magnifying Glass, Lighthouse, Parachute
 
       UNIQUENESS: Every item_type across the ENTIRE palace must be different. No two concepts may share the same item.
 
@@ -226,13 +232,17 @@ export async function processDocuments(palaceId: string) {
       )
 
       for (const saved of savedObjects) {
-        const parts = allMeshes[saved.dbId] ?? [{ primitive: 'sphere' as const, color: '#ff00ff', position: [0, 0, 0] as [number, number, number], scale: [1.4, 1.4, 1.4] as [number, number, number] }]
-        const meshJson = JSON.stringify({ parts })
-        const meshPath = `meshes/${palace.id}/${saved.dbId}.json`
+        const meshData = allMeshes[saved.dbId];
+        const scriptContent = meshData ? meshData.code : `
+          const geometry = new THREE.BoxGeometry(1, 1, 1);
+          const material = new THREE.MeshPhysicalMaterial({ color: 0xff00ff });
+          return new THREE.Mesh(geometry, material);
+        `;
+        const meshPath = `meshes/${palace.id}/${saved.dbId}.js`;
 
         const { error: meshErr } = await supabase.storage
           .from('palace-models')
-          .upload(meshPath, meshJson, { contentType: 'application/json', upsert: true })
+          .upload(meshPath, scriptContent, { contentType: 'application/javascript', upsert: true })
 
         if (meshErr) {
           console.error(`  Mesh upload failed for "${saved.label}": ${meshErr.message}`)

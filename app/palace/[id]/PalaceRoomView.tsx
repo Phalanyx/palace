@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState, useRef, useEffect, Suspense } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { Library, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star, CheckCircle, XCircle, Send, ArrowLeft, ClipboardList } from 'lucide-react';
+import Link from 'next/link';
 import { Bedroom } from './rooms/Bedroom';
 import { GreatHall } from './rooms/GreatHall';
 import { Kitchen } from './rooms/Kitchen';
 import { Library as LibraryRoom } from './rooms/Library';
-import { PalaceExterior } from './PalaceExterior';
 
 interface RoomObject {
   id: string;
@@ -30,6 +30,17 @@ interface Room {
   objects: RoomObject[];
 }
 
+interface TestQuestion {
+  objectId: string;
+  questionText: string;
+  correctAnswer: string;
+  score?: number | null;
+  feedback?: string | null;
+  userAnswer?: string | null;
+}
+
+type AppPhase = 'explore' | 'ready_to_test' | 'starting' | 'test' | 'grading' | 'results';
+
 const ROOM_LABELS: Record<string, string> = {
   bedroom: '🛏️ Bedroom',
   great_hall: '🏰 Great Hall',
@@ -37,7 +48,7 @@ const ROOM_LABELS: Record<string, string> = {
   library: '📚 Library',
 };
 
-type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number; onCloseObject?: () => void }>;
+type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number; onCloseObject?: () => void; mode?: 'learn' | 'test' }>;
 
 const ROOM_COMPONENTS: Record<string, RoomFC> = {
   bedroom: Bedroom as RoomFC,
@@ -53,7 +64,6 @@ const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: 
   library: { position: [0, 10, 20], target: [0, 4, 1] },
 };
 
-// Mirrors the slot positions defined in each room component
 const ROOM_SLOTS: Record<string, [number, number, number][]> = {
   bedroom: [
     [-1.5, 3.5, -2], [-3.8, 2.5, -2], [5.5, 3.5, 1.5], [-5, 2, 4], [6, 5, -5],
@@ -69,14 +79,7 @@ const ROOM_SLOTS: Record<string, [number, number, number][]> = {
   ],
 };
 
-// Animates OrbitControls target smoothly to a slot position
-function CameraTargetAnimator({
-  target,
-  controlsRef,
-}: {
-  target: THREE.Vector3;
-  controlsRef: React.RefObject<any>;
-}) {
+function CameraTargetAnimator({ target, controlsRef }: { target: THREE.Vector3; controlsRef: React.RefObject<any> }) {
   useFrame(() => {
     if (!controlsRef.current) return;
     controlsRef.current.target.lerp(target, 0.07);
@@ -85,247 +88,443 @@ function CameraTargetAnimator({
   return null;
 }
 
-export default function PalaceRoomView({ rooms }: { rooms: Room[] }) {
-  const [activeView, setActiveView] = useState<string>('exterior');
-  const [activeObjectIdx, setActiveObjectIdx] = useState<number>(0);
+function ScoreStars({ score }: { score: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(n => (
+        <Star key={n} className={`w-4 h-4 ${n <= score ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+      ))}
+    </div>
+  );
+}
+
+// Module-level so React never remounts it on parent re-render (fixes textarea focus loss)
+function OverlayModal({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm p-6">
+      <div className="w-full max-w-lg">{children}</div>
+    </div>
+  );
+}
+
+export default function PalaceRoomView({
+  rooms,
+  palaceId,
+  palaceTitle,
+  palacePrompt,
+}: {
+  rooms: Room[];
+  palaceId: string;
+  palaceTitle: string;
+  palacePrompt: string;
+}) {
+  const [appPhase, setAppPhase] = useState<AppPhase>('explore');
+  const [activeRoomIdx, setActiveRoomIdx] = useState(0);
+  const [activeObjectIdx, setActiveObjectIdx] = useState(0);
+  const [gradingInstructions, setGradingInstructions] = useState('');
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [testQuestions, setTestQuestions] = useState<TestQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [results, setResults] = useState<TestQuestion[]>([]);
+  const [scorePct, setScorePct] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const controlsRef = useRef<any>(null);
   const cameraTargetRef = useRef(new THREE.Vector3(0, 3, 0));
 
-  const activeRoom = rooms.find(r => r.roomKey === activeView);
-  const RoomComponent = activeView !== 'exterior' ? ROOM_COMPONENTS[activeView] : null;
-  const cameraConfig = activeView !== 'exterior' ? ROOM_CAMERA[activeView] : null;
-  const slots = activeView !== 'exterior' ? (ROOM_SLOTS[activeView] || []) : [];
-  const objects = activeRoom?.objects || [];
+  const activeRoom = rooms[activeRoomIdx];
+  const objects = activeRoom?.objects ?? [];
+  const currentObj = objects[activeObjectIdx];
+  const RoomComponent = activeRoom ? ROOM_COMPONENTS[activeRoom.roomKey] : null;
+  const cameraConfig = activeRoom ? ROOM_CAMERA[activeRoom.roomKey] : null;
+  const slots = activeRoom ? (ROOM_SLOTS[activeRoom.roomKey] || []) : [];
+  const isTestMode = appPhase === 'test';
+  const currentQuestion = isTestMode ? testQuestions.find(q => q.objectId === currentObj?.id) : null;
+  const isAtStart = activeRoomIdx === 0 && activeObjectIdx === 0;
+  const isAtEnd = activeRoomIdx === rooms.length - 1 && activeObjectIdx === objects.length - 1;
 
-  // When room changes, reset object index
   useEffect(() => {
     setActiveObjectIdx(0);
-    if (cameraConfig) {
-      cameraTargetRef.current.set(...cameraConfig.target);
-    }
-  }, [activeView]);
+    if (cameraConfig) cameraTargetRef.current.set(...cameraConfig.target);
+  }, [activeRoomIdx]);
 
-  // When active object changes, animate camera to that slot
   useEffect(() => {
     if (slots[activeObjectIdx]) {
       const [x, y, z] = slots[activeObjectIdx];
       cameraTargetRef.current.set(x, y, z);
     }
-  }, [activeObjectIdx, activeView]);
+  }, [activeObjectIdx, activeRoomIdx]);
 
-  const currentObj = objects[activeObjectIdx];
+  function handleRightArrow() {
+    if (appPhase === 'explore') {
+      if (activeObjectIdx < objects.length - 1) setActiveObjectIdx(activeObjectIdx + 1);
+      else if (activeRoomIdx < rooms.length - 1) { setActiveRoomIdx(activeRoomIdx + 1); setActiveObjectIdx(0); }
+      else setAppPhase('ready_to_test');
+    } else if (appPhase === 'test') {
+      if (activeObjectIdx < objects.length - 1) setActiveObjectIdx(activeObjectIdx + 1);
+      else if (activeRoomIdx < rooms.length - 1) { setActiveRoomIdx(activeRoomIdx + 1); setActiveObjectIdx(0); }
+      else submitAnswers();
+    }
+  }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-[600px]">
+  function handleLeftArrow() {
+    if (activeObjectIdx > 0) setActiveObjectIdx(activeObjectIdx - 1);
+    else if (activeRoomIdx > 0) {
+      const prevRoom = rooms[activeRoomIdx - 1];
+      setActiveRoomIdx(activeRoomIdx - 1);
+      setActiveObjectIdx((prevRoom?.objects?.length ?? 1) - 1);
+    }
+  }
 
-      {/* Left Column: 3D Viewport + Room Tabs */}
-      <div className="lg:col-span-7 flex flex-col gap-4">
-        {/* Room Navigation Tabs */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveView('exterior')}
-            className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all border-2 ${
-              activeView === 'exterior'
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-[0_3px_0_0_rgba(79,70,229,0.5)]'
-                : 'bg-white text-indigo-700 border-indigo-200 hover:border-indigo-400 shadow-[0_3px_0_0_rgba(224,231,255,1)] hover:translate-y-[1px] hover:shadow-[0_2px_0_0_rgba(224,231,255,1)]'
-            }`}
-          >
-            <span className="flex items-center gap-2">🏰 Palace</span>
-          </button>
-          {rooms.map(room => (
-            <button
-              key={room.id}
-              onClick={() => setActiveView(room.roomKey)}
-              className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all border-2 ${
-                activeView === room.roomKey
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-[0_3px_0_0_rgba(79,70,229,0.5)]'
-                  : 'bg-white text-indigo-700 border-indigo-200 hover:border-indigo-400 shadow-[0_3px_0_0_rgba(224,231,255,1)] hover:translate-y-[1px] hover:shadow-[0_2px_0_0_rgba(224,231,255,1)]'
-              }`}
-            >
-              {ROOM_LABELS[room.roomKey] || room.roomKey}
-            </button>
-          ))}
-        </div>
+  async function startSession() {
+    setError(null);
+    setAppPhase('starting');
+    try {
+      const res = await fetch(`/api/palaces/${palaceId}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gradingInstructions: gradingInstructions || 'Grade based on conceptual understanding and accuracy.' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to start test');
+      setSessionId(data.sessionId);
+      setTestQuestions(data.questions);
+      setAnswers({});
+      setActiveRoomIdx(0);
+      setActiveObjectIdx(0);
+      setAppPhase('test');
+    } catch (e: any) {
+      setError(e.message);
+      setAppPhase('ready_to_test');
+    }
+  }
 
-        {/* 3D Viewport */}
-        <div className="rounded-[2rem] overflow-hidden bg-white p-2 border-4 border-indigo-100 shadow-[0_8px_0_0_rgba(224,231,255,1)] flex-grow flex flex-col min-h-[500px]">
-          <div className="flex-grow min-h-[440px] rounded-[1.5rem] overflow-hidden relative">
-            {activeView === 'exterior' ? (
-              <PalaceExterior />
-            ) : (
-              <Canvas
-                shadows
-                camera={{
-                  position: cameraConfig?.position || [12, 10, 14],
-                  fov: 50,
-                  near: 0.1,
-                  far: 200,
-                }}
-                gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 1.2 }}
-              >
-                <Suspense fallback={null}>
-                  {RoomComponent && (
-                    <RoomComponent
-                      objects={objects}
-                      activeObjectIdx={activeObjectIdx}
-                      onCloseObject={() => setActiveObjectIdx(-1)}
-                    />
-                  )}
-                </Suspense>
-                <OrbitControls
-                  ref={controlsRef}
-                  target={cameraConfig?.target || [0, 3, 0]}
-                  enableDamping
-                  dampingFactor={0.08}
-                  minDistance={5}
-                  maxDistance={40}
-                  maxPolarAngle={Math.PI / 2}
-                />
-                <CameraTargetAnimator
-                  target={cameraTargetRef.current}
-                  controlsRef={controlsRef}
-                />
-              </Canvas>
-            )}
-          </div>
+  async function submitAnswers() {
+    if (!sessionId) return;
+    setAppPhase('grading');
+    setError(null);
+    try {
+      const answersPayload = testQuestions.map(q => ({
+        objectId: q.objectId,
+        questionText: q.questionText,
+        correctAnswer: q.correctAnswer,
+        userAnswer: answers[q.objectId] || '',
+      }));
+      const res = await fetch(`/api/palaces/${palaceId}/test/${sessionId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: answersPayload, gradingInstructions }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to grade');
+      setResults(data.gradedItems);
+      setScorePct(data.scorePct);
+      setAppPhase('results');
+    } catch (e: any) {
+      setError(e.message);
+      setAppPhase('test');
+    }
+  }
 
-          {/* Object Slideshow Strip — shown when inside a room with objects */}
-          {activeView !== 'exterior' && objects.length > 0 && (
-            <div className="px-3 pb-2 pt-3 flex items-center gap-3">
-              <button
-                onClick={() => setActiveObjectIdx(i => Math.max(0, i - 1))}
-                disabled={activeObjectIdx === 0}
-                className="w-9 h-9 rounded-full bg-indigo-100 hover:bg-indigo-200 disabled:opacity-30 flex items-center justify-center transition-colors shrink-0"
-              >
-                <ChevronLeft className="w-5 h-5 text-indigo-700" />
-              </button>
+  // ── Shared full-screen canvas backdrop ─────────────────────────────────────
+  // Suppress the forceOpen popup when an overlay modal is shown on top
+  const canvasActiveIdx = (appPhase === 'explore' || appPhase === 'test') ? activeObjectIdx : -1;
 
-              {/* Object dots */}
-              <div className="flex gap-2 flex-1 overflow-x-auto no-scrollbar">
-                {objects.map((obj, i) => (
-                  <button
-                    key={obj.id}
-                    onClick={() => setActiveObjectIdx(i)}
-                    title={obj.label}
-                    className={`shrink-0 h-2 rounded-full transition-all ${
-                      i === activeObjectIdx
-                        ? 'bg-indigo-600 w-8'
-                        : 'bg-indigo-200 hover:bg-indigo-300 w-4'
-                    }`}
-                  />
-                ))}
-              </div>
+  const canvasBackdrop = RoomComponent && (
+    <div className="absolute inset-0">
+      <Canvas
+        key={activeRoom?.roomKey}
+        shadows
+        camera={{ position: cameraConfig?.position || [12, 10, 14], fov: 50, near: 0.1, far: 200 }}
+        gl={{ antialias: true, toneMapping: 4, toneMappingExposure: 1.2 }}
+        style={{ width: '100%', height: '100%' }}
+      >
+        <Suspense fallback={null}>
+          <RoomComponent
+            objects={objects}
+            activeObjectIdx={canvasActiveIdx}
+            onCloseObject={() => {}}
+            mode={isTestMode ? 'test' : 'learn'}
+          />
+        </Suspense>
+        <OrbitControls
+          ref={controlsRef}
+          target={cameraConfig?.target || [0, 3, 0]}
+          enableDamping
+          dampingFactor={0.08}
+          minDistance={5}
+          maxDistance={40}
+          maxPolarAngle={Math.PI / 2}
+        />
+        <CameraTargetAnimator target={cameraTargetRef.current} controlsRef={controlsRef} />
+      </Canvas>
+    </div>
+  );
 
-              <button
-                onClick={() => setActiveObjectIdx(i => Math.min(objects.length - 1, i + 1))}
-                disabled={activeObjectIdx === objects.length - 1}
-                className="w-9 h-9 rounded-full bg-indigo-100 hover:bg-indigo-200 disabled:opacity-30 flex items-center justify-center transition-colors shrink-0"
-              >
-                <ChevronRight className="w-5 h-5 text-indigo-700" />
-              </button>
-            </div>
-          )}
-        </div>
+  // ── Top HUD (always visible over canvas) ───────────────────────────────────
+  const topHud = (
+    <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between p-4 pointer-events-none">
+      {/* Left: back button */}
+      <Link
+        href="/dashboard"
+        className="pointer-events-auto flex items-center gap-2 bg-black/40 backdrop-blur-md text-white px-4 py-2.5 rounded-full font-bold text-sm hover:bg-black/60 transition-colors border border-white/10"
+      >
+        <ArrowLeft className="w-4 h-4" /> Back to Hub
+      </Link>
 
-        {/* Active Object Card (below viewport) */}
-        {activeView !== 'exterior' && currentObj && (
-          <div className="bg-white rounded-2xl p-5 border-2 border-indigo-100 shadow-sm flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-600 shrink-0">
-              {activeObjectIdx + 1}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-lg text-indigo-950 capitalize">{currentObj.label}</h3>
-              <p className="text-indigo-600/80 text-sm leading-snug mt-0.5">{currentObj.description}</p>
-              {currentObj.sampleQuestion && (
-                <div className="mt-2 p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
-                  <span className="text-xs font-bold text-indigo-400 uppercase tracking-wide">Sample Q: </span>
-                  <span className="text-sm text-indigo-700 italic">{currentObj.sampleQuestion}</span>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-xs text-indigo-400 shrink-0">
-              <Eye className="w-3.5 h-3.5" />
-              <span>{activeObjectIdx + 1}/{objects.length}</span>
-            </div>
-          </div>
-        )}
+      {/* Center: title + goal */}
+      <div className="pointer-events-none text-center max-w-md px-4">
+        <h1 className="text-white font-black text-xl font-['Baloo_2'] drop-shadow-lg leading-tight">{palaceTitle}</h1>
+        <p className="text-white/70 text-xs font-medium drop-shadow mt-0.5 line-clamp-1">{palacePrompt}</p>
       </div>
 
-      {/* Right Column: Objects for Active Room */}
-      <div className="lg:col-span-5 flex flex-col gap-6">
-        <div className="bg-white rounded-[2rem] p-8 border-4 border-indigo-50 shadow-[0_8px_0_0_rgba(224,231,255,1)] flex-grow">
-          <h2 className="text-3xl font-black font-['Baloo_2'] text-indigo-900 mb-6 flex items-center gap-3">
-            <Library className="text-indigo-500" />
-            {activeView === 'exterior' ? 'All Objects' : `${ROOM_LABELS[activeView] || activeView} Objects`}
-          </h2>
+      {/* Right: history link */}
+      <Link
+        href={`/palace/${palaceId}/history`}
+        className="pointer-events-auto flex items-center gap-2 bg-black/40 backdrop-blur-md text-white px-4 py-2.5 rounded-full font-bold text-sm hover:bg-black/60 transition-colors border border-white/10"
+      >
+        <ClipboardList className="w-4 h-4" /> History
+      </Link>
+    </div>
+  );
 
-          {activeView === 'exterior' ? (
-            rooms.length === 0 ? (
-              <div className="text-center py-10 opacity-60 font-medium text-lg text-indigo-800 bg-indigo-50 rounded-2xl border-2 border-dashed border-indigo-200">
-                No rooms generated yet.
-              </div>
-            ) : (
-              <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {rooms.map((room) => (
-                  <div key={room.id}>
-                    <button
-                      onClick={() => setActiveView(room.roomKey)}
-                      className="text-sm font-black uppercase tracking-widest text-indigo-500 mb-2 hover:text-indigo-700 transition-colors cursor-pointer flex items-center gap-2"
-                    >
-                      {ROOM_LABELS[room.roomKey] || room.roomKey}
-                      <span className="text-xs font-medium text-indigo-300">→ Enter</span>
-                    </button>
-                    <ul className="space-y-2">
-                      {room.objects.map((obj) => (
-                        <li key={obj.id} className="flex gap-3 p-3 rounded-xl hover:bg-indigo-50 transition-colors">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-sm text-indigo-600">
-                            {obj.orderIndex}
-                          </div>
-                          <div>
-                            <h3 className="font-bold text-indigo-950 capitalize">{obj.label}</h3>
-                            <p className="text-sm text-indigo-600/70 line-clamp-1">{obj.description}</p>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
+  // ── Ready to Test overlay ───────────────────────────────────────────────────
+  if (appPhase === 'ready_to_test' || appPhase === 'starting') {
+    const isLoading = appPhase === 'starting';
+    return (
+      <div className="relative w-full h-full">
+        {canvasBackdrop}
+        {topHud}
+        <OverlayModal>
+          <div className="bg-white rounded-[2rem] p-8 space-y-5 shadow-2xl">
+            <div className="text-center space-y-1">
+              <div className="text-4xl">🏰</div>
+              <h2 className="text-2xl font-black text-indigo-950 font-['Baloo_2']">You've explored the entire palace!</h2>
+              <p className="text-indigo-500 text-sm font-medium">Set grading instructions and start the test.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wide">Grading Instructions</label>
+              <textarea
+                value={gradingInstructions}
+                onChange={e => setGradingInstructions(e.target.value)}
+                placeholder="e.g. 'Focus on correct terminology. Partial credit for partially correct answers.'"
+                className="w-full h-24 p-3 rounded-xl border-2 border-indigo-100 bg-indigo-50 text-indigo-900 placeholder-indigo-300 focus:outline-none focus:border-indigo-400 resize-none text-sm"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-indigo-400">Leave blank for default grading.</p>
+            </div>
+            {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-xl">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setAppPhase('explore');
+                  setActiveRoomIdx(rooms.length - 1);
+                  setActiveObjectIdx((rooms[rooms.length - 1]?.objects?.length ?? 1) - 1);
+                }}
+                className="flex-1 bg-indigo-50 text-indigo-700 font-bold py-3 px-4 rounded-xl hover:bg-indigo-100 transition-colors text-sm"
+                disabled={isLoading}
+              >
+                ← Go back
+              </button>
+              <button
+                onClick={startSession}
+                disabled={isLoading}
+                className="flex-grow bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+              >
+                {isLoading
+                  ? <><span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> Loading...</>
+                  : <><ChevronRight className="w-4 h-4" /> Start Test</>}
+              </button>
+            </div>
+          </div>
+        </OverlayModal>
+      </div>
+    );
+  }
+
+  // ── Grading overlay ─────────────────────────────────────────────────────────
+  if (appPhase === 'grading') {
+    return (
+      <div className="relative w-full h-full">
+        {canvasBackdrop}
+        {topHud}
+        <OverlayModal>
+          <div className="bg-white rounded-[2rem] p-12 flex flex-col items-center gap-5 shadow-2xl">
+            <span className="animate-spin w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full" />
+            <p className="text-xl font-bold text-indigo-700">Grading your answers...</p>
+          </div>
+        </OverlayModal>
+      </div>
+    );
+  }
+
+  // ── Results overlay ─────────────────────────────────────────────────────────
+  if (appPhase === 'results') {
+    const totalScore = results.reduce((s, r) => s + (r.score ?? 0), 0);
+    const maxScore = results.length * 5;
+    const pct = Math.round(scorePct ?? 0);
+    return (
+      <div className="relative w-full h-full">
+        {canvasBackdrop}
+        {topHud}
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-lg space-y-4 my-auto py-20">
+            {/* Score banner */}
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-[2rem] p-8 text-white text-center shadow-2xl">
+              <p className="text-base font-bold opacity-80">Your Score</p>
+              <p className="text-7xl font-black font-['Baloo_2']">{pct}%</p>
+              <p className="opacity-80 mt-1 text-sm">{totalScore} / {maxScore} points</p>
+            </div>
+            {/* Per-question results */}
+            {results.map((r, i) => {
+              const score = r.score ?? 0;
+              const isGood = score >= 3;
+              return (
+                <div key={i} className={`bg-white rounded-2xl p-5 border-2 ${isGood ? 'border-green-100' : 'border-red-100'} shadow-sm`}>
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <p className="font-bold text-indigo-900 flex-1 text-sm">{r.questionText}</p>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <ScoreStars score={score} />
+                      <span className={`text-xs font-bold ${isGood ? 'text-green-600' : 'text-red-500'}`}>{score}/5</span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )
-          ) : (
-            !activeRoom || activeRoom.objects.length === 0 ? (
-              <div className="text-center py-10 opacity-60 font-medium text-lg text-indigo-800 bg-indigo-50 rounded-2xl border-2 border-dashed border-indigo-200">
-                No objects in this room.
-              </div>
-            ) : (
-              <ul className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {activeRoom.objects.map((obj, i) => (
-                  <li
-                    key={obj.id}
-                    onClick={() => setActiveObjectIdx(i)}
-                    className={`flex gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer ${
-                      i === activeObjectIdx
-                        ? 'bg-indigo-50 border-indigo-200'
-                        : 'border-transparent hover:bg-indigo-50/50 hover:border-indigo-100'
-                    }`}
-                  >
-                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-black border shadow-sm transition-all ${
-                      i === activeObjectIdx
-                        ? 'bg-indigo-600 text-white border-indigo-600 scale-110'
-                        : 'bg-indigo-100 text-indigo-600 border-indigo-200'
-                    }`}>
-                      {i + 1}
+                  <div className="bg-indigo-50 rounded-xl p-3 mb-2">
+                    <p className="text-xs font-bold text-indigo-400 mb-1">YOUR ANSWER</p>
+                    <p className="text-sm text-indigo-900">{r.userAnswer || <em className="text-indigo-300">No answer</em>}</p>
+                  </div>
+                  {r.feedback && (
+                    <div className={`rounded-xl p-3 ${isGood ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
+                      <p className="text-xs font-bold mb-1 flex items-center gap-1">
+                        {isGood ? <CheckCircle className="w-3 h-3 text-green-500" /> : <XCircle className="w-3 h-3 text-red-400" />}
+                        <span className={isGood ? 'text-green-600' : 'text-red-500'}>AI Feedback</span>
+                      </p>
+                      <p className="text-sm text-gray-700">{r.feedback}</p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-xl text-indigo-950 capitalize">{obj.label}</h3>
-                      <p className="text-indigo-600/80 text-sm leading-snug line-clamp-2">{obj.description}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )
+                  )}
+                </div>
+              );
+            })}
+            <button
+              onClick={() => { setAppPhase('explore'); setResults([]); setScorePct(null); setActiveRoomIdx(0); setActiveObjectIdx(0); }}
+              className="w-full bg-white text-indigo-700 font-bold py-4 rounded-2xl hover:bg-indigo-50 transition-colors shadow-sm"
+            >
+              Take Another Test
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Explore / Test — full-screen canvas with overlaid controls ─────────────
+  return (
+    <div className="relative w-full h-full">
+      {/* Full-screen 3D canvas */}
+      {canvasBackdrop}
+
+      {/* Top HUD */}
+      {topHud}
+
+      {/* Room + mode indicator */}
+      <div className="absolute top-16 left-0 right-0 flex justify-center z-10 pointer-events-none">
+        <div className="flex items-center gap-2">
+          <span className="bg-black/40 backdrop-blur-md text-white text-xs font-bold px-4 py-1.5 rounded-full border border-white/10">
+            {ROOM_LABELS[activeRoom?.roomKey] || activeRoom?.roomKey}
+          </span>
+          {isTestMode && (
+            <span className="bg-purple-600/80 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 rounded-full">
+              Test Mode
+            </span>
           )}
         </div>
+      </div>
+
+      {/* Left arrow */}
+      <button
+        onClick={handleLeftArrow}
+        disabled={isAtStart}
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-black/60 disabled:opacity-20 transition-all"
+      >
+        <ChevronLeft className="w-6 h-6" />
+      </button>
+
+      {/* Right arrow */}
+      <button
+        onClick={handleRightArrow}
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-black/60 transition-all"
+        title={!isTestMode && isAtEnd ? 'Ready to Test' : 'Next'}
+      >
+        <ChevronRight className="w-6 h-6" />
+      </button>
+
+      {/* Hint badge when at last object in explore mode */}
+      {!isTestMode && isAtEnd && (
+        <div className="absolute right-20 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+          <span className="bg-indigo-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-md">
+            Ready to Test?
+          </span>
+        </div>
+      )}
+
+      {/* Bottom: dot strip + info card */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 flex flex-col items-center gap-3 p-4 pb-6">
+        {/* Object dots */}
+        {objects.length > 0 && (
+          <div className="flex gap-2 justify-center px-20">
+            {objects.map((obj, i) => (
+              <button
+                key={obj.id}
+                onClick={() => setActiveObjectIdx(i)}
+                title={obj.label}
+                className={`h-2 rounded-full transition-all ${
+                  i === activeObjectIdx ? 'bg-white w-8' : 'bg-white/40 hover:bg-white/70 w-4'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Info card */}
+        {currentObj && (
+          <div className="bg-black/60 backdrop-blur-md rounded-2xl p-4 w-full max-w-xl border border-white/10 shadow-xl">
+            <div className="flex gap-3 items-start">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-black text-white text-sm shrink-0">
+                {activeObjectIdx + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-white capitalize text-base leading-tight">{currentObj.label}</h3>
+
+                {!isTestMode && (
+                  <p className="text-white/70 text-sm leading-snug mt-1">{currentObj.description}</p>
+                )}
+
+                {isTestMode && (
+                  <textarea
+                    value={answers[currentObj.id] || ''}
+                    onChange={e => setAnswers(a => ({ ...a, [currentObj.id]: e.target.value }))}
+                    placeholder="Write your answer here..."
+                    className="mt-2 w-full h-20 p-2.5 rounded-xl bg-white/10 text-white placeholder-white/30 border border-white/20 focus:outline-none focus:border-white/50 resize-none text-sm"
+                  />
+                )}
+              </div>
+              <span className="text-white/40 text-xs shrink-0 font-medium">{activeObjectIdx + 1}/{objects.length}</span>
+            </div>
+
+            {isTestMode && isAtEnd && (
+              <div className="mt-3 pt-3 border-t border-white/10">
+                <button
+                  onClick={submitAnswers}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-2.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm"
+                >
+                  <Send className="w-4 h-4" /> Submit &amp; Grade
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <p className="text-red-300 text-sm bg-red-900/40 backdrop-blur-md px-4 py-2 rounded-xl border border-red-500/30">{error}</p>
+        )}
       </div>
     </div>
   );
