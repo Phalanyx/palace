@@ -44,3 +44,5 @@ next-env.d.ts
 .worktrees/
 .agent/credentials.json
 credentials.json
+
+.codex

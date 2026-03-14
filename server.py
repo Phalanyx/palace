@@ -13,28 +13,34 @@ import json
 import ssl
 import certifi
 import os
+import google.auth
 from websockets.legacy.server import WebSocketServerProtocol
 from websockets.legacy.protocol import WebSocketCommonProtocol
 from websockets.exceptions import ConnectionClosed
 
 from google.oauth2 import service_account
 from google.auth.transport.requests import Request
-import os
-import json
 
 DEBUG = False  # Set to True for verbose logging
-WS_PORT = 8080    # Port for WebSocket server
+WS_PORT = int(os.environ.get("PORT", "8080"))
 
 
 def generate_access_token():
-    """Retrieves an access token using a Service Account JSON key."""
+    """Retrieves an access token from the available Google auth source."""
     try:
         scopes = ['https://www.googleapis.com/auth/cloud-platform']
         creds = None
 
-        # 1. PRIMARY (Production): Try environment variable
+        # 1. Cloud runtime: use Application Default Credentials if available.
+        try:
+            creds, _ = google.auth.default(scopes=scopes)
+            print("🔑 Using Application Default Credentials")
+        except Exception:
+            creds = None
+
+        # 2. Explicit env credentials for non-ADC environments.
         env_creds = os.environ.get("GOOGLE_CREDENTIALS")
-        if env_creds:
+        if env_creds and not creds:
             print("🔑 Using Service Account from GOOGLE_CREDENTIALS environment variable")
             try:
                 creds_info = json.loads(env_creds)
@@ -44,7 +50,7 @@ def generate_access_token():
                 print("❌ Invalid JSON in GOOGLE_CREDENTIALS environment variable.")
                 return None
 
-        # 2. FALLBACK (Local Development): Try credentials.json file
+        # 3. Local fallback for development.
         if not creds:
             creds_path = os.path.join(os.path.dirname(__file__), 'credentials.json')
             if os.path.exists(creds_path):
@@ -53,8 +59,8 @@ def generate_access_token():
                     creds_path, scopes=scopes)
             else:
                  print("❌ Authentication Error:")
-                 print("   1. In production: Set the GOOGLE_CREDENTIALS environment variable to your JSON key.")
-                 print("   2. In local dev: Place a 'credentials.json' file in this folder.")
+                 print("   1. In production: attach a service account or provide GOOGLE_CREDENTIALS.")
+                 print("   2. In local dev: set GOOGLE_CREDENTIALS or place a 'credentials.json' file in this folder.")
                  return None
 
         # Mint the actual short-lived access token
@@ -194,9 +200,9 @@ async def handle_websocket_client(client_websocket: WebSocketServerProtocol) -> 
         bearer_token = service_setup_message_data.get("bearer_token")
         service_url = service_setup_message_data.get("service_url")
 
-        # If no bearer token provided, generate one using service account credentials
+        # If no bearer token provided, mint one using the active Google auth source.
         if not bearer_token:
-            print("🔑 Generating access token using Service Account (credentials.json)...")
+            print("🔑 Generating access token using Google credentials...")
             bearer_token = generate_access_token()
             if not bearer_token:
                 print("❌ Failed to generate access token")
@@ -230,7 +236,7 @@ async def handle_websocket_client(client_websocket: WebSocketServerProtocol) -> 
 async def start_websocket_server():
     """Start the WebSocket proxy server."""
     async with websockets.serve(handle_websocket_client, "0.0.0.0", WS_PORT):
-        print(f"🔌 WebSocket proxy running on ws://localhost:{WS_PORT}")
+        print(f"🔌 WebSocket proxy listening on 0.0.0.0:{WS_PORT}")
         # Run forever
         await asyncio.Future()
 
@@ -244,11 +250,12 @@ async def main():
 ║     Gemini Live API Proxy Server                          ║
 ╠════════════════════════════════════════════════════════════╣
 ║                                                            ║
-║  🔌 WebSocket Proxy: ws://localhost:{WS_PORT:<5}                   ║
+║  🔌 WebSocket Proxy Port: {WS_PORT:<5}                            ║
 ║                                                            ║
 ║  Authentication:                                           ║
-║  1. GOOGLE_CREDENTIALS env var (Production)                ║
-║  2. Local credentials.json file (Development)             ║
+║  1. Application Default Credentials                        ║
+║  2. GOOGLE_CREDENTIALS env var                             ║
+║  3. Local credentials.json file                            ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
 """)

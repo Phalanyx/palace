@@ -11,7 +11,8 @@ export interface BuddyContextInput {
     description: string;
     sampleQuestion: string | null;
   } | null;
-  mode: 'explore' | 'test-hint';
+  openObjects: Array<{ label: string; description: string }>;
+  mode: 'explore' | 'test-hint' | 'buddy-quiz';
   currentQuestion?: string;
 }
 
@@ -34,6 +35,13 @@ ${ctx.currentRoom.objects.map(o => `- ${o.label}: ${o.description}`).join('\n')}
 `;
   }
 
+  if (ctx.openObjects.length > 0) {
+    prompt += `
+CURRENTLY OPEN POPUPS (user is actively viewing these objects):
+${ctx.openObjects.map(o => `- ${o.label}: ${o.description}`).join('\n')}
+`;
+  }
+
   if (ctx.selectedObject) {
     prompt += `
 FOCUSED TOPIC: "${ctx.selectedObject.label}"
@@ -50,6 +58,18 @@ Your role: Give HINTS only — do NOT give the direct answer. Help the user reca
 - Pointing to related concepts from the course content
 - Encouraging them to think about what the object "${ctx.selectedObject?.label || 'in focus'}" represents
 Keep responses concise and spoken (you are a voice assistant).
+`;
+  } else if (ctx.mode === 'buddy-quiz') {
+    prompt += `
+QUIZ MODE ACTIVE: You are the quiz master.
+- Pick one object from the current room and ask the user a question about it
+- Wait for their answer
+- Give brief feedback (correct/incorrect + brief explanation)
+- Then move on to the next object/question
+- Cover all objects in the room before repeating
+- Keep questions conversational and spoken
+- Do NOT give the answer before the user responds
+Start immediately by asking the first question.
 `;
   } else {
     prompt += `

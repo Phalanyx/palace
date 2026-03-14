@@ -25,6 +25,8 @@ interface DynamicObjectProps {
   position: [number, number, number];
   forceOpen?: boolean;
   onClose?: () => void;
+  onObjectOpen?: (id: string) => void;
+  onObjectClose?: (id: string) => void;
   mode?: 'learn' | 'test';
 }
 
@@ -64,7 +66,7 @@ const FALLBACK_PARTS: MeshPart[] = [
   { primitive: 'sphere', color: '#ff00ff', position: [0, 0, 0], scale: [1, 1, 1] },
 ];
 
-export function DynamicObject({ objectData, position, forceOpen = false, onClose, mode = 'learn' }: DynamicObjectProps) {
+export function DynamicObject({ objectData, position, forceOpen = false, onClose, onObjectOpen, onObjectClose, mode = 'learn' }: DynamicObjectProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHover] = useState(false);
   const [clicked, setClick] = useState(false);
@@ -113,7 +115,15 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
       position={position}
       onPointerOver={e => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; }}
       onPointerOut={e => { e.stopPropagation(); setHover(false); document.body.style.cursor = 'auto'; }}
-      onClick={e => { e.stopPropagation(); setClick(c => !c); }}
+      onClick={e => {
+        e.stopPropagation();
+        setClick(c => {
+          const next = !c;
+          if (next) onObjectOpen?.(objectData.id);
+          else onObjectClose?.(objectData.id);
+          return next;
+        });
+      }}
     >
       {parts.map((p, i) => <PartMesh key={i} part={p} />)}
 
@@ -154,7 +164,7 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
                 {mode === 'test' ? '❓ Question' : (objectData.metadata?.itemType ?? objectData.label)}
               </span>
               <button
-                onClick={() => { setClick(false); onClose?.(); }}
+                onClick={() => { setClick(false); onClose?.(); onObjectClose?.(objectData.id); }}
                 style={{ background: 'none', border: 'none', color: '#888', fontSize: 16, cursor: 'pointer' }}
               >✕</button>
             </div>

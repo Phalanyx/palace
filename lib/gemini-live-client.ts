@@ -4,7 +4,10 @@
  * Uses Vertex AI WebSocket proxy (server.py) for authentication
  */
 
-export const PROXY_URL = 'ws://localhost:8080';
+const DEFAULT_LOCAL_PROXY_URL = 'ws://localhost:8080';
+const configuredProxyUrl = process.env.NEXT_PUBLIC_BUDDY_WS_URL?.trim();
+
+export const PROXY_URL = configuredProxyUrl || DEFAULT_LOCAL_PROXY_URL;
 export const GEMINI_LIVE_MODEL = 'gemini-2.0-flash-live-preview-04-09';
 const PROJECT_ID = process.env.NEXT_PUBLIC_GCP_PROJECT_ID || 'project-078a97fa-7470-4e5a-b47';
 const LOCATION = process.env.NEXT_PUBLIC_GCP_LOCATION || 'us-central1';

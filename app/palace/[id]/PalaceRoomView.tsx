@@ -49,7 +49,7 @@ const ROOM_LABELS: Record<string, string> = {
   library: '📚 Library',
 };
 
-type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number; onCloseObject?: () => void; mode?: 'learn' | 'test' }>;
+type RoomFC = React.FC<{ objects?: RoomObject[]; activeObjectIdx?: number; onCloseObject?: () => void; onObjectOpen?: (id: string) => void; onObjectClose?: (id: string) => void; mode?: 'learn' | 'test' }>;
 
 const ROOM_COMPONENTS: Record<string, RoomFC> = {
   bedroom: Bedroom as RoomFC,
@@ -131,6 +131,7 @@ export default function PalaceRoomView({
   const [results, setResults] = useState<TestQuestion[]>([]);
   const [scorePct, setScorePct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openObjectIds, setOpenObjectIds] = useState<Set<string>>(new Set());
   const controlsRef = useRef<any>(null);
   const cameraTargetRef = useRef(new THREE.Vector3(0, 3, 0));
 
@@ -142,6 +143,15 @@ export default function PalaceRoomView({
   const slots = activeRoom ? (ROOM_SLOTS[activeRoom.roomKey] || []) : [];
   const isTestMode = appPhase === 'test';
   const currentQuestion = isTestMode ? testQuestions.find(q => q.objectId === currentObj?.id) : null;
+  // Reset open objects when room changes
+  useEffect(() => { setOpenObjectIds(new Set()); }, [activeRoomIdx]);
+
+  const handleObjectOpen = (id: string) => setOpenObjectIds(prev => new Set(prev).add(id));
+  const handleObjectClose = (id: string) => setOpenObjectIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+
+  // Derive the currently-open objects with full data for BuddyAgent context
+  const openObjects = objects.filter(o => openObjectIds.has(o.id));
+
   const isAtStart = activeRoomIdx === 0 && activeObjectIdx === 0;
   const isAtEnd = activeRoomIdx === rooms.length - 1 && activeObjectIdx === objects.length - 1;
 
@@ -246,6 +256,8 @@ export default function PalaceRoomView({
             objects={objects}
             activeObjectIdx={canvasActiveIdx}
             onCloseObject={() => {}}
+            onObjectOpen={handleObjectOpen}
+            onObjectClose={handleObjectClose}
             mode={isTestMode ? 'test' : 'learn'}
           />
         </Suspense>
@@ -520,6 +532,7 @@ export default function PalaceRoomView({
         palace={{ title: palaceTitle, prompt: palacePrompt, documents: palaceDocuments }}
         currentRoom={activeRoom ?? null}
         selectedObject={currentObj ?? null}
+        openObjects={openObjects}
         isTestMode={appPhase === 'test'}
         currentTestQuestion={currentQuestion?.questionText}
       />

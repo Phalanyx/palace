@@ -10,6 +10,7 @@ interface RoomObject {
   label: string;
   description: string;
   sampleQuestion?: string | null;
+  metadata?: { itemType?: string; [key: string]: any } | null;
 }
 
 interface Room {
@@ -32,6 +33,7 @@ interface BuddyAgentProps {
   palace: Palace;
   currentRoom: Room | null;
   selectedObject: RoomObject | null;
+  openObjects: RoomObject[];
   isTestMode: boolean;
   currentTestQuestion?: string;
 }
@@ -48,9 +50,11 @@ export default function BuddyAgent({
   palace,
   currentRoom,
   selectedObject,
+  openObjects,
   isTestMode,
   currentTestQuestion,
 }: BuddyAgentProps) {
+  const [buddyMode, setBuddyMode] = useState<'explore' | 'quiz'>('explore');
   const [connected, setConnected] = useState(false);
   const [micActive, setMicActive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -161,23 +165,46 @@ export default function BuddyAgent({
     selectedObject: selectedObject
       ? { label: selectedObject.label, description: selectedObject.description, sampleQuestion: selectedObject.sampleQuestion ?? null }
       : null,
-    mode: isTestMode ? 'test-hint' : 'explore',
+    openObjects: openObjects.map(o => ({ label: o.label, description: o.description })),
+    mode: isTestMode ? 'test-hint' : buddyMode === 'quiz' ? 'buddy-quiz' : 'explore',
     currentQuestion: currentTestQuestion,
-  }), [palace, currentRoom, selectedObject, isTestMode, currentTestQuestion]);
+  }), [palace, currentRoom, selectedObject, openObjects, isTestMode, currentTestQuestion, buddyMode]);
 
-  // Auto-update system prompt when context changes
+  // Auto-update system prompt when context changes.
+  // For room/mode changes: full reconnect (system prompt is baked into setup).
+  // For popup open/close changes (openObjects): inject a context message instead of reconnecting.
   useEffect(() => {
     if (!connected || !clientRef.current) return;
     const prompt = buildSystemPrompt(buildContext());
-    if (prompt !== prevContextRef.current) {
-      prevContextRef.current = prompt;
-      clientRef.current.updateSystemPrompt(prompt);
-      setStatusText('Context updated — reconnecting...');
-      setConnected(false);
-      setMicActive(false);
-      streamerRef.current?.stop();
+    if (prompt === prevContextRef.current) return;
+    prevContextRef.current = prompt;
+    clientRef.current.updateSystemPrompt(prompt);
+    setStatusText('Context updated — reconnecting...');
+    setConnected(false);
+    setMicActive(false);
+    streamerRef.current?.stop();
+  }, [currentRoom, isTestMode, currentTestQuestion, buddyMode, connected, buildContext]);
+
+  // When open popups change, silently update the stored prompt (no reconnect).
+  // Also send a brief context message so the AI knows without reconnecting.
+  useEffect(() => {
+    if (!connected || !clientRef.current) return;
+    const prompt = buildSystemPrompt(buildContext());
+    if (prompt === prevContextRef.current) return;
+    prevContextRef.current = prompt;
+    // Store updated prompt for next reconnect; send a context hint this session
+    if (openObjects.length > 0) {
+      clientRef.current.sendText(
+        `[System context update: The user currently has these popups open — ` +
+        openObjects.map(o => {
+          const visualName = (o as any).metadata?.itemType;
+          const alias = visualName && visualName !== o.label ? ` (also called "${visualName}" in the UI)` : '';
+          return `"${o.label}"${alias}: ${o.description}`;
+        }).join('; ') +
+        '. If the user refers to any of these by their visual name or label, you know exactly what they mean.]'
+      );
     }
-  }, [currentRoom, selectedObject, isTestMode, currentTestQuestion, connected, buildContext]);
+  }, [openObjects, connected, buildContext]);
 
   function handleConnect() {
     setError(null);
@@ -344,18 +371,40 @@ export default function BuddyAgent({
           </div>
 
           {/* Context bar */}
-          <div className="px-3 py-2 flex gap-1.5 flex-wrap" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="px-3 py-2 flex gap-1.5 flex-wrap items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <span className="text-xs px-2 py-0.5 rounded-full font-medium"
               style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.2)' }}>
               {contextLevel}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={isTestMode
-                ? { background: 'rgba(245,158,11,0.12)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)' }
-                : { background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.2)' }
-              }>
-              {isTestMode ? 'Test mode' : 'Explore mode'}
-            </span>
+            {isTestMode ? (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={{ background: 'rgba(245,158,11,0.12)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)' }}>
+                Test mode
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={() => setBuddyMode('explore')}
+                  className="text-xs px-2 py-0.5 rounded-full font-medium transition-all"
+                  style={buddyMode === 'explore'
+                    ? { background: 'rgba(16,185,129,0.25)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.4)' }
+                    : { background: 'rgba(16,185,129,0.06)', color: 'rgba(110,231,183,0.4)', border: '1px solid rgba(16,185,129,0.12)' }
+                  }
+                >
+                  Explore
+                </button>
+                <button
+                  onClick={() => setBuddyMode('quiz')}
+                  className="text-xs px-2 py-0.5 rounded-full font-medium transition-all"
+                  style={buddyMode === 'quiz'
+                    ? { background: 'rgba(168,85,247,0.25)', color: '#d8b4fe', border: '1px solid rgba(168,85,247,0.4)' }
+                    : { background: 'rgba(168,85,247,0.06)', color: 'rgba(216,180,254,0.4)', border: '1px solid rgba(168,85,247,0.12)' }
+                  }
+                >
+                  Quiz
+                </button>
+              </>
+            )}
           </div>
 
           {/* Error */}
