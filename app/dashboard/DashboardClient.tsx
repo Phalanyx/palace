@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { UploadCloud, CheckCircle2, RotateCw, XCircle } from "lucide-react"
+import Link from 'next/link'
 
 interface DashboardProps {
   palaces: any[]
@@ -61,9 +62,10 @@ export default function DashboardClient({ initialPalaces }: { initialPalaces: an
         {/* List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {palaces.map((palace) => (
-            <div 
+            <Link 
+              href={`/palace/${palace.id}`}
               key={palace.id} 
-              className="group bg-white rounded-3xl p-6 border-4 border-indigo-100/50 shadow-sm hover:border-indigo-200 transition-colors duration-200 cursor-pointer relative overflow-hidden"
+              className="group bg-white rounded-3xl p-6 border-4 border-indigo-100/50 shadow-sm hover:border-indigo-200 transition-colors duration-200 cursor-pointer relative overflow-hidden block"
             >
               <div className="flex justify-between items-start mb-4">
                 <StatusBadge status={palace.status} />
@@ -82,7 +84,7 @@ export default function DashboardClient({ initialPalaces }: { initialPalaces: an
                   </span>
                 </div>
               )}
-            </div>
+            </Link>
           ))}
           
           {palaces.length === 0 && (

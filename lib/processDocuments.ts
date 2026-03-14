@@ -1,34 +1,39 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"
+import { GoogleGenAI, Type } from "@google/genai"
 import { prisma } from "./prisma"
+import { uploadToMoorcheh, createNamespace } from "./moorcheh"
+import { createClient } from '@supabase/supabase-js'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" })
 
 const objectSchema = {
-  type: SchemaType.ARRAY,
+  type: Type.ARRAY,
   items: {
-    type: SchemaType.OBJECT,
+    type: Type.OBJECT,
     properties: {
-      label: { type: SchemaType.STRING, description: "Short name, max 4 words" },
-      description: { type: SchemaType.STRING, description: "2-3 sentence explanation" },
+      label: { type: Type.STRING, description: "Short name, max 4 words" },
+      description: { type: Type.STRING, description: "2-3 sentence explanation" },
       model_key: { 
-        type: SchemaType.STRING, 
+        type: Type.STRING, 
         enum: ["book", "scroll", "crystal", "orb", "flask", "key", "coin", "torch"],
         description: "Visual representation type"
       },
-      color_hint: { type: SchemaType.STRING, description: "e.g., 'deep blue', 'warm amber'" },
-      order_index: { type: SchemaType.INTEGER },
+      color_hint: { type: Type.STRING, description: "e.g., 'deep blue', 'warm amber'" },
+      order_index: { type: Type.INTEGER },
       metadata: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          importance: { type: SchemaType.STRING, enum: ["high", "medium", "low"] },
-          relationships: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-          source_hint: { type: SchemaType.STRING }
+          importance: { type: Type.STRING, enum: ["high", "medium", "low"] },
+          relationships: { type: Type.ARRAY, items: { type: Type.STRING } },
+          source_hint: { type: Type.STRING }
         }
       }
     },
     required: ["label", "description", "model_key", "order_index"]
   }
-} as unknown as import("@google/generative-ai").Schema
+}
 
 export async function processDocuments(palaceId: string) {
   try {
@@ -39,33 +44,77 @@ export async function processDocuments(palaceId: string) {
 
     if (!palace) throw new Error("Palace not found")
 
-    // 1. Extract text
-    // For hackathon timeline, just assuming rawText is populated during upload or 
-    // extracting basic .txt content if available. Proper PDF/PPT extraction usually 
-    // needs dedicated parsers like pdf-parse which is added but complex to hook up 
-    // cleanly in a background async fn without proper queues.
-    // For this prompt, we will mock the extraction to keep velocity high, assuming 
-    // text is provided or downloaded from storage.
-    
-    // Simplification for hackathon speed:
+    // 1. Extract actual text from Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const combinedTextArray: string[] = []
+    const documentChunks: { id: string; text: string; metadata?: any }[] = []
+
+    for (const doc of palace.documents) {
+      if (!doc.storageUrl) continue
+
+      const { data, error } = await supabase.storage.from('palace-documents').download(doc.storageUrl)
+      if (error || !data) {
+        console.error(`Failed to download ${doc.fileName}:`, error)
+        continue
+      }
+      
+      const buffer = Buffer.from(await data.arrayBuffer())
+      const tempFilePath = path.join(os.tmpdir(), `upload-${doc.id}-${doc.fileName}`)
+      fs.writeFileSync(tempFilePath, buffer)
+
+      console.log(`Uploading ${doc.fileName} to Gemini...`)
+      const uploadResult = await ai.files.upload({
+        file: tempFilePath,
+        config: {
+          mimeType: doc.fileType === 'pdf' ? 'application/pdf' : 
+                   (doc.fileType === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation' : 'text/plain')
+        }
+      })
+      console.log(`Uploaded to Gemini as ${uploadResult.name}`)
+
+      const transcriptionPrompt = "Extract and transcribe all the visible text content from this document from start to finish. Output ONLY the raw text without any markdown or formatting additions."
+      const transcriptionResult = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          { role: "user", parts: [{ text: transcriptionPrompt }, { fileData: { fileUri: uploadResult.uri, mimeType: uploadResult.mimeType } }] }
+        ]
+      })
+
+      const text = transcriptionResult.text || ""
+      combinedTextArray.push(`--- Document: ${doc.fileName} ---\n${text}`)
+
+      // Cleanup
+      fs.unlinkSync(tempFilePath)
+      await ai.files.delete({ name: uploadResult.name! })
+
+      // Prepare chunks for Moorcheh (approx 2000 chars per chunk)
+      const chunkSize = 2000
+      for (let i = 0; i < text.length; i += chunkSize) {
+        const chunkText = text.substring(i, i + chunkSize)
+        if (chunkText.trim()) {
+           documentChunks.push({
+             id: `${doc.id}-chunk-${i}`,
+             text: chunkText.trim(),
+             metadata: {
+               documentId: doc.id,
+               fileName: doc.fileName
+             }
+           })
+        }
+      }
+    }
+
     const combinedText = `
       Contents from uploaded documents for: ${palace.title}
       We are focusing on: ${palace.prompt}
       
-      This is a placeholder for the actual extracted text from the documents.
-      In a real implementation, we would download the file from Supabase Storage 
-      using the storageUrl, and parse the text based on fileType (.txt, .pdf).
+      ${combinedTextArray.join('\n\n')}
     `
 
-    // 2. Call Gemini
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: objectSchema,
-      }
-    })
-
+    // 2. Call Gemini for Objects
     const systemPrompt = `
       You are building a memory palace. Given document text and a user's learning goal,
       extract the most important concepts as memory palace objects.
@@ -74,8 +123,18 @@ export async function processDocuments(palaceId: string) {
       Aim for 8-15 objects total, ordered by how a student would encounter them.
     `
 
-    const response = await model.generateContent([systemPrompt, combinedText])
-    const responseText = response.response.text()
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }, { text: combinedText }] }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: objectSchema
+      }
+    })
+
+    const responseText = response.text || "[]"
     const generatedObjects = JSON.parse(responseText)
 
     // 3. Save to database
@@ -97,9 +156,25 @@ export async function processDocuments(palaceId: string) {
       await prisma.object.createMany({
         data: objectsToCreate
       })
+
+      // 4. Upload to Moorcheh Namespace
+      const namespace = `${process.env.MOORCHEH_PREFIX || ''}Palace${palace.id}`
+      await createNamespace(namespace)
+      
+      const enrichedChunks = documentChunks.map(chunk => ({
+        ...chunk,
+        metadata: {
+          ...chunk.metadata,
+          objectLabels: objectsToCreate.map((o: any) => o.label)
+        }
+      }))
+
+      if (enrichedChunks.length > 0) {
+        await uploadToMoorcheh(namespace, enrichedChunks).catch(err => console.error("Non-fatal Moorcheh upload error:", err))
+      }
     }
 
-    // 4. Update status
+    // 5. Update status
     await prisma.palace.update({
       where: { id: palaceId },
       data: { status: 'ready' }
