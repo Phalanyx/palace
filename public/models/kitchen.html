@@ -1,11 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-<style>*{margin:0;padding:0}body{overflow:hidden;background:#1e2a22}canvas{display:block}#info{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:#7a9a7a;font-family:monospace;font-size:13px;opacity:.7;pointer-events:none}</style>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1e2a22; overflow: hidden; }
+canvas { display: block; }
+#hud { position: fixed; top: 14px; left: 14px; background: rgba(0,0,0,0.75); color: #00ff88; font-family: monospace; font-size: 13px; padding: 10px 14px; border-radius: 8px; line-height: 1.8; pointer-events: none; border: 1px solid rgba(0,255,136,0.2); }
+#hud span { color: #fff; }
+#copy { position: fixed; top: 14px; right: 14px; background: #1a1a2e; color: #00ff88; font-family: monospace; font-size: 12px; padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(0,255,136,0.3); cursor: pointer; }
+#copy:hover { background: #252540; }
+#copied { position: fixed; top: 54px; right: 14px; color: #00ff88; font-family: monospace; font-size: 11px; opacity: 0; transition: opacity 0.3s; }
+#slots-panel { position: fixed; top: 90px; left: 14px; background: rgba(0,0,0,0.75); color: #ff00ff; font-family: monospace; font-size: 12px; padding: 10px 14px; border-radius: 8px; line-height: 1.6; border: 1px solid rgba(255,0,255,0.2); }
+#slots-panel div { cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+#slots-panel div:hover { background: rgba(255,0,255,0.2); }
+#info { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); color: #666; font-family: monospace; font-size: 12px; }
+</style>
 </head>
 <body>
-<div id="info">drag to orbit · scroll to zoom</div>
+<div id="hud">
+  pos:    [<span id="px">0</span>, <span id="py">0</span>, <span id="pz">0</span>]<br>
+  target: [<span id="tx">0</span>, <span id="ty">0</span>, <span id="tz">0</span>]
+</div>
+<button id="copy" onclick="copyKeyframe()">Copy keyframe</button>
+<div id="copied">Copied!</div>
+<div id="slots-panel"></div>
+<div id="info">drag to orbit · scroll to zoom · right-drag to pan</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x1e2a22);
@@ -313,20 +334,85 @@ const f3=new THREE.PointLight(0xffaa55,1.5,15);f3.position.set(4,5,2);scene.add(
 const f4=new THREE.PointLight(0xff8844,1,12);f4.position.set(0,3,4);scene.add(f4);
 const cF=new THREE.DirectionalLight(0x4a6a5a,.3);cF.position.set(0,8,10);scene.add(cF);
 
-// ====== ORBIT ======
-let isDrag=false,pX=0,pY=0,theta=0,phi=.55,radius=18;
-const tgt=new THREE.Vector3(0,3.5,0);
-function upCam(){camera.position.x=tgt.x+radius*Math.sin(phi)*Math.sin(theta);camera.position.y=tgt.y+radius*Math.cos(phi);camera.position.z=tgt.z+radius*Math.sin(phi)*Math.cos(theta);camera.lookAt(tgt);}
-upCam();
-R.domElement.addEventListener('pointerdown',e=>{isDrag=true;pX=e.clientX;pY=e.clientY;});
-window.addEventListener('pointerup',()=>isDrag=false);
-window.addEventListener('pointermove',e=>{if(!isDrag)return;theta+=(e.clientX-pX)*.005;phi=Math.max(.15,Math.min(1.4,phi-(e.clientY-pY)*.005));pX=e.clientX;pY=e.clientY;upCam();});
-R.domElement.addEventListener('wheel',e=>{radius=Math.max(6,Math.min(30,radius+e.deltaY*.015));upCam();});
+// ====== ORBIT CONTROLS ======
+camera.position.set(0, 12, 18);
+const controls = new THREE.OrbitControls(camera, R.domElement);
+controls.target.set(0, 3.5, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.update();
+
+// ====== SLOT MARKERS ======
+const slotPositions = [
+  [0, 2.8, 2.5],       // Floating above the main prep table
+  [-5.5, 2.6, 3.5],    // Floating above the side table
+  [6, 3, 3],           // On top of the barrels
+  [0, 8.5, -7],        // On top of the hearth
+  [-4.5, 3.3, -3]      // Floating above the cauldron
+];
+
+const markerMat = new THREE.MeshBasicMaterial({color: 0xff00ff, transparent: true, opacity: 0.6});
+const markerGeo = new THREE.SphereGeometry(0.35, 12, 8);
+
+slotPositions.forEach(function(pos, idx) {
+  const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(pos[0], pos[1], pos[2]);
+  scene.add(marker);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ff00ff';
+  ctx.font = 'bold 48px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(idx), 32, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({map: tex, depthTest: false});
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.position.set(pos[0], pos[1] + 0.7, pos[2]);
+  sprite.scale.set(0.8, 0.8, 1);
+  scene.add(sprite);
+});
+
+// ====== SLOTS PANEL ======
+const slotsPanel = document.getElementById('slots-panel');
+slotPositions.forEach(function(pos, idx) {
+  const div = document.createElement('div');
+  div.textContent = 'Slot ' + idx + ': [' + pos.join(', ') + ']';
+  div.addEventListener('click', function() {
+    controls.target.set(pos[0], pos[1], pos[2]);
+    controls.update();
+  });
+  slotsPanel.appendChild(div);
+});
+
+// ====== COPY KEYFRAME ======
+function copyKeyframe() {
+  const p = camera.position;
+  const t = controls.target;
+  const fmt = v => Math.round(v * 100) / 100;
+  const text = '{ pos: [' + fmt(p.x) + ', ' + fmt(p.y) + ', ' + fmt(p.z) + '], target: [' + fmt(t.x) + ', ' + fmt(t.y) + ', ' + fmt(t.z) + '] }';
+  navigator.clipboard.writeText(text).then(() => {
+    const el = document.getElementById('copied');
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 1200);
+  });
+}
+window.copyKeyframe = copyKeyframe;
 
 // ====== ANIMATE ======
 const clock=new THREE.Clock();
 function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
 fl.forEach(f=>{const n=f.idx||0;if(f.light){const b=f.baseIntensity||1;f.light.intensity=b+Math.sin(t*7+n)*b*.18+Math.sin(t*13+n*2)*b*.12;}if(f.flame){f.flame.scale.y=1.5+Math.sin(t*9+n)*.4;f.flame.scale.x=1+Math.sin(t*7+n*3)*.2;}});
+controls.update();
+// HUD update
+document.getElementById('px').textContent = camera.position.x.toFixed(2);
+document.getElementById('py').textContent = camera.position.y.toFixed(2);
+document.getElementById('pz').textContent = camera.position.z.toFixed(2);
+document.getElementById('tx').textContent = controls.target.x.toFixed(2);
+document.getElementById('ty').textContent = controls.target.y.toFixed(2);
+document.getElementById('tz').textContent = controls.target.z.toFixed(2);
 R.render(scene,camera);}
 animate();
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();R.setSize(innerWidth,innerHeight);});
