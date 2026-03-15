@@ -56,8 +56,8 @@ export async function POST(request: Request) {
 
     // Generate a title + refined learning goal, informed by actual file content when available
     const contextNote = fileContext
-      ? 'The user has also uploaded source documents (excerpts below). Use the actual content to create a specific, accurate title and learning goal.'
-      : 'No files were uploaded, so base everything on the user\'s prompt.'
+      ? 'The user has supplied source material below. Use that content to create a specific, accurate title and learning goal.'
+      : 'No source material was supplied, so base everything on the user\'s prompt.'
 
     const result = await ai.models.generateContent({
       model: 'gemini-2.5-flash',

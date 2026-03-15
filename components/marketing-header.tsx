@@ -16,17 +16,17 @@ const navItems = [
 
 export function MarketingHeader({ user }: MarketingHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[rgba(2,6,23,0.72)] backdrop-blur-2xl">
+    <header className="sticky top-0 z-40 border-b border-[color:var(--landing-line)] bg-[color:color-mix(in_srgb,var(--landing-footer-bg)_82%,transparent)] backdrop-blur-2xl">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-3 transition-transform hover:-translate-y-0.5">
-          <div className="flex size-11 items-center justify-center rounded-[1.35rem] border border-white/12 bg-white/8 text-primary shadow-lg shadow-black/20">
+          <div className="flex size-11 items-center justify-center rounded-[1.35rem] border border-[color:var(--landing-line)] bg-[color:var(--landing-pill-bg)] text-primary shadow-lg shadow-black/10 dark:shadow-black/20">
             <CastleIcon className="size-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-[family-name:var(--font-baloo)] text-2xl leading-none text-white">
+            <span className="font-[family-name:var(--font-baloo)] text-2xl leading-none text-[color:var(--landing-text)]">
               Palace
             </span>
-            <span className="hidden text-xs text-white/55 sm:block">
+            <span className="hidden text-xs text-[color:var(--landing-text-soft)] sm:block">
               Study worlds with sticky recall
             </span>
           </div>
@@ -38,7 +38,7 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
               key={label}
               variant="ghost"
               asChild
-              className="rounded-full px-3 text-sm text-white/68 hover:bg-white/8 hover:text-white"
+              className="rounded-full px-3 text-sm text-[color:var(--landing-text-soft)] hover:bg-[color:var(--landing-pill-bg)] hover:text-[color:var(--landing-text)]"
             >
               <a href={href}>
               <Icon className="size-4 text-primary/70" />
@@ -54,7 +54,7 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
               <Button
                 variant="outline"
                 asChild
-                className="hidden rounded-full border-white/12 bg-white/8 px-4 text-white hover:bg-white/12 hover:text-white sm:inline-flex"
+                className="hidden rounded-full border-[color:var(--landing-line)] bg-[color:var(--landing-pill-bg)] px-4 text-[color:var(--landing-text)] hover:bg-[color:color-mix(in_srgb,var(--landing-pill-bg)_84%,var(--landing-text)_8%)] hover:text-[color:var(--landing-text)] sm:inline-flex"
               >
                 <Link href="/dashboard">
                 My Memory Palaces
@@ -67,7 +67,7 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
               <Button
                 variant="ghost"
                 asChild
-                className="rounded-full text-white/72 hover:bg-white/8 hover:text-white"
+                className="rounded-full text-[color:var(--landing-text-soft)] hover:bg-[color:var(--landing-pill-bg)] hover:text-[color:var(--landing-text)]"
               >
                 <Link href="/login">
                 Log in

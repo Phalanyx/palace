@@ -124,8 +124,14 @@ function ScoreStars({ score }: { score: number }) {
 function OverlayModal({ children }: { children: React.ReactNode }) {
   return (
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/palace_logo.png" alt="Palace" className="h-16 w-auto mb-4 drop-shadow-lg" />
+      <span className="mb-4 dark:hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/palace_logo_black.png" alt="Palace" className="h-16 w-auto drop-shadow-lg" />
+      </span>
+      <span className="mb-4 hidden dark:inline">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/palace_logo.png" alt="Palace" className="h-16 w-auto drop-shadow-lg" />
+      </span>
       <div className="w-full max-w-lg">{children}</div>
     </div>
   );

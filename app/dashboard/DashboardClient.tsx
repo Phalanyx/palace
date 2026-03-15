@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/glass/avatar"
 import DragonSceneLoader from "@/components/dragon-scene-loader"
 import { UserDropdown } from "@/components/user-dropdown"
 import { clearLandingDraft, loadLandingDraft } from "@/lib/landing-draft"
+import { PROMPT_CATEGORIES, PROMPT_LIBRARY, type PromptTemplate } from "@/lib/promptLibrary"
 
 interface Palace {
   id: string
@@ -22,20 +23,20 @@ interface Palace {
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'ready') return (
-    <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-200">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+    <div className="flex items-center gap-1.5 rounded-full border border-emerald-700/18 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-800 dark:border-emerald-400/35 dark:bg-emerald-400/12 dark:text-emerald-100">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-300" />
       Operational
     </div>
   )
   if (status === 'processing') return (
-    <div className="flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-200">
+    <div className="flex items-center gap-1.5 rounded-full border border-sky-700/18 bg-sky-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-800 dark:border-sky-400/30 dark:bg-sky-400/12 dark:text-sky-100">
       <RotateCw className="h-3 w-3 animate-spin" />
       Drafting Space
     </div>
   )
   if (status === 'error') return (
-    <div className="flex items-center gap-1.5 rounded-full border border-rose-400/35 bg-rose-400/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-rose-200">
-      <span className="flex h-3 w-3 items-center justify-center rounded-full border border-rose-300 text-[8px] font-black">!</span>
+    <div className="flex items-center gap-1.5 rounded-full border border-rose-700/18 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-rose-800 dark:border-rose-400/35 dark:bg-rose-400/12 dark:text-rose-100">
+      <span className="flex h-3 w-3 items-center justify-center rounded-full border border-rose-500 text-[8px] font-black dark:border-rose-300">!</span>
       Structural Error
     </div>
   )
@@ -141,19 +142,29 @@ function PalaceCard({ palace }: { palace: Palace }) {
   )
 }
 
-const PROMPTS = [
-  { title: "The Grand Library", desc: "Classic wood-paneled halls for literature and philosophy.", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80" },
-  { title: "Neo-Tokyo Grid", desc: "Cyberpunk neon landmarks for technology and coding.", img: "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=400&q=80" },
-  { title: "Quantum Void", desc: "Infinite cosmic vacuum for abstract physics concepts.", img: "https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=400&q=80" },
-  { title: "Bauhaus Pavilion", desc: "Minimal geometric volumes for systematic logic.", img: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=400&q=80" },
-]
-
-const FILTER_TABS = ["ALL", "STYLE", "THEME", "STRUCTURE", "LEARNING METHOD"]
+const FILTER_TABS = ["ALL", ...PROMPT_CATEGORIES]
+const TEMPLATE_ATTACHMENT_PREFIX = "__prompt-library__-"
 const NAV_TABS = [
   { value: "home", label: "Home", icon: Home },
   { value: "projects", label: "Projects", icon: FolderOpen },
   { value: "prompt-library", label: "Prompt Library", icon: BookOpen },
 ]
+
+function buildTemplateAttachment(template: PromptTemplate) {
+  const sourceLabel = template.sourceAssetPath
+    ? `Source asset path: ${template.sourceAssetPath}\n\n`
+    : ""
+
+  return new File(
+    [sourceLabel + template.topicContext],
+    `${TEMPLATE_ATTACHMENT_PREFIX}${template.id}.txt`,
+    { type: "text/plain" }
+  )
+}
+
+function withoutTemplateAttachment(files: File[]) {
+  return files.filter((file) => !file.name.startsWith(TEMPLATE_ATTACHMENT_PREFIX))
+}
 
 function DashboardHeader({
   activeNavTab,
@@ -165,16 +176,26 @@ function DashboardHeader({
   user: User | null
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-[color:color-mix(in_srgb,var(--dashboard-surface-strong)_92%,transparent)] backdrop-blur-2xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 items-center gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/palace_logo.png" alt="Palace" className="h-14 w-auto sm:h-16" />
+    <header className="sticky top-0 z-40 px-4 pt-4 sm:px-6 lg:px-8">
+      <div className="dashboard-header-shell mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center">
+          <div className="dashboard-brand-lockup">
+            <div className="dashboard-brand-mark">
+              <span className="dark:hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/palace_logo_black.png" alt="Palace" className="h-12 w-auto sm:h-14" />
+              </span>
+              <span className="hidden dark:inline">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/palace_logo.png" alt="Palace" className="h-12 w-auto sm:h-14" />
+              </span>
+            </div>
+          </div>
         </div>
 
         <nav
           aria-label="Dashboard navigation"
-          className="hidden items-center gap-1 md:flex"
+          className="dashboard-nav hidden items-center gap-1 md:flex"
         >
           {NAV_TABS.map(({ value, label, icon: Icon }) => {
             const isActive = value === activeNavTab
@@ -186,10 +207,10 @@ function DashboardHeader({
                 onClick={() => onNavChange(value)}
                 aria-current={isActive ? "page" : undefined}
                 className={[
-                  "flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                  "dashboard-nav-button flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "dashboard-accent-pill text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                    : "dashboard-text-soft hover:bg-[color:color-mix(in_srgb,var(--dashboard-surface)_72%,transparent)] hover:text-foreground",
+                    ? "dashboard-nav-button-active"
+                    : "dashboard-nav-button-idle",
                 ].join(" ")}
               >
                 <Icon className="size-4" />
@@ -199,12 +220,12 @@ function DashboardHeader({
           })}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden text-right md:block">
-            <div className="dashboard-text-soft text-[10px] font-semibold uppercase tracking-[0.28em]">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+          <div className="dashboard-workspace-meta hidden text-right md:block">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.3em]">
               Dashboard
             </div>
-            <div className="dashboard-text-muted text-sm">
+            <div className="text-base">
               Memory Palace Workspace
             </div>
           </div>
@@ -231,10 +252,10 @@ function DashboardHeader({
               onClick={() => onNavChange(value)}
               aria-current={isActive ? "page" : undefined}
               className={[
-                "flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
+                "dashboard-nav-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
                 isActive
-                  ? "dashboard-accent-pill text-foreground"
-                  : "dashboard-surface dashboard-text-soft",
+                  ? "dashboard-nav-button-active"
+                  : "dashboard-nav-button-idle",
               ].join(" ")}
             >
               <Icon className="size-3.5 shrink-0" />
@@ -251,23 +272,72 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
   const searchParams = useSearchParams()
   const [palaces, setPalaces] = useState(initialPalaces)
   const [inputText, setInputText] = useState("")
+  const [searchText, setSearchText] = useState("")
   const [activeNavTab, setActiveNavTab] = useState("home")
   const [activeFilter, setActiveFilter] = useState("ALL")
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [pendingGenerations, setPendingGenerations] = useState(0)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+  const [selectedPromptTemplate, setSelectedPromptTemplate] = useState<PromptTemplate | null>(null)
   const hasHandledLandingIntent = useRef(false)
+  const homeSectionRef = useRef<HTMLDivElement | null>(null)
+  const projectsSectionRef = useRef<HTMLElement | null>(null)
+  const promptLibrarySectionRef = useRef<HTMLElement | null>(null)
+
+  const visiblePrompts = PROMPT_LIBRARY.filter((template) => {
+    const matchesFilter = activeFilter === "ALL" || template.category === activeFilter
+    const query = searchText.trim().toLowerCase()
+
+    if (!query) {
+      return matchesFilter
+    }
+
+    return matchesFilter && [
+      template.title,
+      template.description,
+      template.prompt,
+      template.topicContext,
+      template.category,
+    ].some(value => value.toLowerCase().includes(query))
+  })
+
+  function handleNavChange(value: string) {
+    setActiveNavTab(value)
+
+    const sectionMap: Record<string, HTMLElement | null> = {
+      home: homeSectionRef.current,
+      projects: projectsSectionRef.current,
+      "prompt-library": promptLibrarySectionRef.current,
+    }
+
+    sectionMap[value]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    })
+  }
 
   async function generatePalace(prompt: string, files: File[] = []) {
     const trimmedPrompt = prompt.trim()
 
-    if (!trimmedPrompt || isGenerating) {
+    if (!trimmedPrompt) {
       return false
     }
 
-    setIsGenerating(true)
+    const optimisticId = `queued-${crypto.randomUUID()}`
+    const optimisticTitle = trimmedPrompt.slice(0, 48) || "Queued palace"
+
     setGenerateError(null)
+    setPendingGenerations(prev => prev + 1)
+    setPalaces(prev => [{
+      id: optimisticId,
+      title: optimisticTitle,
+      prompt: trimmedPrompt,
+      status: 'processing',
+      coverImageUrl: null,
+      _count: { rooms: 0 },
+      testSessions: [],
+    }, ...prev])
 
     try {
       const formData = new FormData()
@@ -280,34 +350,41 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
       if (!res.ok) {
         const err = await res.json().catch(() => null) as { error?: string } | null
         setGenerateError(err?.error ?? 'Something went wrong')
+        setPalaces(prev => prev.filter(palace => palace.id !== optimisticId))
         return false
       }
       const data = await res.json()
-      setPalaces(prev => [{
-        id: data.palaceId,
-        title: data.title,
-        prompt: data.prompt,
-        status: 'processing',
-        coverImageUrl: null,
-        _count: { rooms: 0 },
-        testSessions: [],
-      }, ...prev])
+      setPalaces(prev => prev.map(palace => palace.id === optimisticId
+        ? {
+            ...palace,
+            id: data.palaceId,
+            title: data.title,
+            prompt: data.prompt,
+          }
+        : palace
+      ))
       return true
     } catch {
       setGenerateError('Network error — please try again')
+      setPalaces(prev => prev.filter(palace => palace.id !== optimisticId))
       return false
     } finally {
-      setIsGenerating(false)
+      setPendingGenerations(prev => Math.max(0, prev - 1))
     }
   }
 
-  async function handleGenerate() {
-    const created = await generatePalace(inputText, attachedFiles)
+  function handleGenerate() {
+    const queuedPrompt = inputText.trim()
+    const queuedFiles = attachedFiles
 
-    if (created) {
-      setInputText("")
-      setAttachedFiles([])
+    if (!queuedPrompt) {
+      return
     }
+
+    setInputText("")
+    setAttachedFiles([])
+    setSelectedPromptTemplate(null)
+    void generatePalace(queuedPrompt, queuedFiles)
   }
 
   useEffect(() => {
@@ -329,37 +406,76 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
         return
       }
 
-      setInputText(draft.prompt)
-      setAttachedFiles(draft.files)
-
       const created = await generatePalace(draft.prompt, draft.files)
 
       if (created) {
         await clearLandingDraft()
-        setInputText("")
-        setAttachedFiles([])
       }
 
       router.replace("/dashboard")
     })()
   }, [router, searchParams, user])
 
+  useEffect(() => {
+    const sections = [
+      { key: "home", element: homeSectionRef.current },
+      { key: "projects", element: projectsSectionRef.current },
+      { key: "prompt-library", element: promptLibrarySectionRef.current },
+    ].filter((section): section is { key: string; element: HTMLElement } => Boolean(section.element))
+
+    if (sections.length === 0) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+
+        if (visibleEntries.length === 0) {
+          return
+        }
+
+        const activeSection = sections.find(
+          (section) => section.element === visibleEntries[0].target
+        )
+
+        if (activeSection) {
+          setActiveNavTab(activeSection.key)
+        }
+      },
+      {
+        rootMargin: "-20% 0px -55% 0px",
+        threshold: [0.2, 0.35, 0.6],
+      }
+    )
+
+    sections.forEach(({ element }) => observer.observe(element))
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
+
   return (
     <div className="glass-page min-h-screen font-sans text-foreground">
         <DashboardHeader
           activeNavTab={activeNavTab}
-          onNavChange={setActiveNavTab}
+          onNavChange={handleNavChange}
           user={user}
         />
 
       {/* Hero with dragon scene background */}
-      <div className="relative overflow-hidden" style={{ minHeight: 980 }}>
+      <div ref={homeSectionRef} className="relative overflow-hidden" style={{ minHeight: 980 }}>
         {/* Dragon scene fills the hero */}
         <div className="absolute inset-0 bg-background">
           <DragonSceneLoader />
         </div>
         {/* Vignette on all 4 edges */}
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 50%, transparent 40%, var(--glass-page-bg) 100%)" }} />
+        {/* Center scrim keeps the hero copy readable over bright scene highlights */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--glass-page-bg) 84%, transparent) 0%, color-mix(in srgb, var(--glass-page-bg) 52%, transparent) 30%, transparent 68%)" }} />
         {/* Extra fade at bottom to blend into page */}
         <div className="absolute inset-x-0 bottom-0 h-48" style={{ background: "linear-gradient(to top, var(--glass-page-bg), transparent)" }} />
 
@@ -380,6 +496,36 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
               placeholder="Describe the palace you want to create..."
               className="min-h-[130px] w-full resize-none bg-transparent px-6 pt-6 pb-4 text-base text-foreground outline-none placeholder:text-[color:var(--dashboard-text-soft)]"
             />
+            {selectedPromptTemplate && (
+              <div className="mx-6 mb-4 rounded-2xl border border-border/70 bg-[color:color-mix(in_srgb,var(--dashboard-surface)_74%,transparent)] px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[color:var(--dashboard-text-soft)]">
+                      Library Context Attached
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{selectedPromptTemplate.title}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                      {selectedPromptTemplate.topicContext}
+                    </p>
+                    {selectedPromptTemplate.sourceAssetPath && (
+                      <p className="mt-1 text-[11px] font-mono text-[color:var(--dashboard-text-soft)]">
+                        Source path: {selectedPromptTemplate.sourceAssetPath}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPromptTemplate(null)
+                      setAttachedFiles((currentFiles) => withoutTemplateAttachment(currentFiles))
+                    }}
+                    className="dashboard-pill rounded-full px-3 py-1.5 text-xs"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between border-t border-border bg-[color:color-mix(in_srgb,var(--dashboard-surface-alt)_72%,transparent)] px-5 pb-5 pt-4">
               <div className="flex items-center gap-3">
                 <label className="dashboard-pill flex cursor-pointer items-center gap-2 rounded-full px-3 py-2 text-xs transition-colors hover:text-foreground">
@@ -394,16 +540,22 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
                     multiple
                     accept=".txt,.pdf,.md"
                     className="hidden"
-                    onChange={e => setAttachedFiles(e.target.files ? Array.from(e.target.files) : [])}
+                    onChange={e => {
+                      const uploaded = e.target.files ? Array.from(e.target.files) : []
+                      setAttachedFiles([
+                        ...withoutTemplateAttachment(attachedFiles),
+                        ...uploaded,
+                      ])
+                    }}
                   />
                 </label>
               </div>
               <button
                 onClick={handleGenerate}
                 className="flex h-12 items-center gap-2 rounded-full border border-primary/35 bg-primary/18 px-5 text-sm font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors hover:bg-primary/24 disabled:opacity-30"
-                disabled={!inputText.trim() || isGenerating}
+                disabled={!inputText.trim()}
               >
-                {isGenerating ? (
+                {pendingGenerations > 0 ? (
                   <RotateCw className="w-4 h-4 animate-spin" />
                 ) : (
                   <ArrowUp className="w-5 h-5" />
@@ -432,7 +584,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
       </div>
 
       {/* Recent Palaces */}
-      <section className="mx-auto mb-16 max-w-7xl px-6 pt-12">
+      <section ref={projectsSectionRef} className="mx-auto mb-16 max-w-7xl px-6 pt-12">
         <div className="mb-6 flex items-end justify-between gap-6">
           <div>
             <p className="dashboard-heading-kicker mb-2 text-[11px] font-semibold uppercase tracking-[0.28em]">
@@ -456,7 +608,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
       </section>
 
       {/* Discover Prompts */}
-      <section className="mx-auto max-w-7xl px-6 pb-16">
+      <section ref={promptLibrarySectionRef} className="mx-auto max-w-7xl px-6 pb-16">
         <div className="dashboard-panel rounded-[32px] px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -467,7 +619,12 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
           </div>
           <div className="dashboard-pill flex w-72 items-center gap-2 rounded-full px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <Search className="dashboard-text-soft h-4 w-4" />
-            <input placeholder="Search prompts..." className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[color:var(--dashboard-text-soft)]" />
+            <input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search prompts..."
+              className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-[color:var(--dashboard-text-soft)]"
+            />
           </div>
         </div>
 
@@ -488,21 +645,35 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {PROMPTS.map(p => (
+          {visiblePrompts.map((template) => (
             <div
-              key={p.title}
+              key={template.id}
               className="dashboard-panel group overflow-hidden rounded-[26px] transition-transform duration-200 hover:-translate-y-1"
             >
               <div className="relative h-44 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.img} alt={p.title} className="h-full w-full object-cover opacity-58 transition-opacity group-hover:opacity-72" />
+                <img src={template.coverImage} alt={template.title} className="h-full w-full object-cover opacity-58 transition-opacity group-hover:opacity-72" />
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-background/36 to-transparent" />
               </div>
               <div className="p-4">
-                <div className="mb-1 text-sm font-black tracking-wider uppercase text-foreground">{p.title}</div>
-                <div className="dashboard-text-soft mb-4 text-[10px] font-bold uppercase leading-relaxed tracking-widest">{p.desc}</div>
+                <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.28em] text-[color:var(--dashboard-text-soft)]">
+                  {template.category}
+                </div>
+                <div className="mb-1 text-sm font-black tracking-wider uppercase text-foreground">{template.title}</div>
+                <div className="dashboard-text-soft mb-2 text-[10px] font-bold uppercase leading-relaxed tracking-widest">{template.description}</div>
+                <p className="mb-4 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                  {template.topicContext}
+                </p>
                 <button
-                  onClick={() => { setInputText(`Create a palace inspired by: ${p.title}. ${p.desc}`); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                  onClick={() => {
+                    setInputText(template.prompt)
+                    setSelectedPromptTemplate(template)
+                    setAttachedFiles((currentFiles) => [
+                      ...withoutTemplateAttachment(currentFiles),
+                      buildTemplateAttachment(template),
+                    ])
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
                   className="dashboard-pill flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium hover:border-primary/35"
                 >
                   + Use Prompt
@@ -511,6 +682,11 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
             </div>
           ))}
         </div>
+        {visiblePrompts.length === 0 && (
+          <div className="dashboard-text-muted rounded-[24px] border border-dashed border-border px-4 py-10 text-center text-sm">
+            No prompt templates match the current search or category filter.
+          </div>
+        )}
         </div>
       </section>
 
@@ -522,7 +698,7 @@ export default function DashboardClient({ initialPalaces, user }: { initialPalac
             </p>
             <h3 className="mt-2 text-lg font-semibold text-foreground">Build better memory spaces.</h3>
             <p className="dashboard-text-muted mt-2 max-w-md text-sm">
-              Create, test, and refine memory palaces with a darker workspace tuned for focus and recall.
+              Create, test, and refine memory palaces in a focused workspace tuned for contrast and recall.
             </p>
           </div>
 

@@ -175,8 +175,14 @@ export default function GlassAuthForm() {
     <div className="flex w-full max-w-md flex-col items-center">
       {/* Logo sits above the card */}
       <div className="mb-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/palace_logo.png" alt="Palace" className="h-24 w-auto" />
+        <span className="dark:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/palace_logo_black.png" alt="Palace" className="h-24 w-auto" />
+        </span>
+        <span className="hidden dark:inline">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/palace_logo.png" alt="Palace" className="h-24 w-auto" />
+        </span>
       </div>
 
       <div

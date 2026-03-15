@@ -126,8 +126,8 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
   return (
     <section className="auth-form-card">
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold tracking-tight text-white">{title}</h2>
-        <p className="text-sm leading-6 text-white/60">{description}</p>
+        <h2 className="text-2xl font-bold tracking-tight text-[color:var(--auth-text)]">{title}</h2>
+        <p className="text-sm leading-6 text-[color:var(--auth-text-muted)]">{description}</p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -161,7 +161,7 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
           </Button>
 
           {isGooglePending ? (
-            <div className="flex items-center gap-2 text-sm text-white/55">
+            <div className="flex items-center gap-2 text-sm text-[color:var(--auth-text-soft)]">
               <LoaderCircleIcon className="animate-spin" />
               Finishing Google sign-in...
             </div>
@@ -169,16 +169,16 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <Separator className="flex-1 bg-white/10" />
-          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-white/35">
+          <Separator className="flex-1 bg-[color:var(--auth-border)]" />
+          <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-[color:var(--auth-text-soft)]">
             or
           </span>
-          <Separator className="flex-1 bg-white/10" />
+          <Separator className="flex-1 bg-[color:var(--auth-border)]" />
         </div>
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${mode}-email`} className="text-white/75">
+            <Label htmlFor={`${mode}-email`} className="text-[color:var(--auth-text-muted)]">
               Email
             </Label>
             <div className="auth-input-wrap">
@@ -198,7 +198,7 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center">
-              <Label htmlFor={`${mode}-password`} className="text-white/75">
+              <Label htmlFor={`${mode}-password`} className="text-[color:var(--auth-text-muted)]">
                 Password
               </Label>
             </div>
@@ -229,9 +229,9 @@ export function AuthForm({ mode, nextPath = "/dashboard" }: AuthFormProps) {
         </form>
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-sm text-white/55">
+      <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--auth-text-soft)]">
         <span>{isSignup ? "Have an account?" : "Don't have an account?"}</span>
-        <Button variant="ghost" asChild className="h-auto px-1 py-0 text-white hover:bg-transparent hover:text-white">
+        <Button variant="ghost" asChild className="h-auto px-1 py-0 text-[color:var(--auth-text)] hover:bg-transparent hover:text-[color:var(--auth-text)]">
           <Link href={alternateHref}>
             {isSignup ? "Sign in" : "Sign up"}
           </Link>

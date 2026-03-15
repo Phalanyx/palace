@@ -14,10 +14,10 @@ import {
   SparklesIcon,
 } from "lucide-react"
 
-import DragonSceneStaticLoader from "@/components/dragon-scene-static-loader"
+import DragonSceneLoader from "@/components/dragon-scene-loader"
 import { MarketingHeader } from "@/components/marketing-header"
 import { Button } from "@/components/ui/button"
-import { clearLandingDraft, saveLandingDraft } from "@/lib/landing-draft"
+import { saveLandingDraft } from "@/lib/landing-draft"
 
 const landingSteps = [
   {
@@ -68,30 +68,15 @@ export function LandingPageClient({ user }: { user: User | null }) {
     }
 
     try {
-      const formData = new FormData()
-      formData.append("prompt", trimmedPrompt)
-      attachedFiles.forEach((file) => formData.append("files", file))
-
-      const response = await fetch("/api/palaces/generate", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(payload?.error ?? "Failed to create your memory palace.")
-      }
-
-      await clearLandingDraft()
-      router.push("/dashboard")
+      await saveLandingDraft(trimmedPrompt, attachedFiles)
+      router.push("/dashboard?intent=create-palace")
       router.refresh()
     } catch (submissionError) {
       setError(
         submissionError instanceof Error
           ? submissionError.message
-          : "Failed to create your memory palace."
+          : "Failed to prepare your memory palace."
       )
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -99,7 +84,7 @@ export function LandingPageClient({ user }: { user: User | null }) {
   return (
     <div className="landing-shell">
       <div className="landing-scene">
-        <DragonSceneStaticLoader />
+        <DragonSceneLoader />
       </div>
       <div className="landing-overlay" />
 
