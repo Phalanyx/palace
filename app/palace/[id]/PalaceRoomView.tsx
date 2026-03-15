@@ -140,7 +140,7 @@ const ROOM_SLOT_KEYFRAMES: Record<string, { pos: [number, number, number]; targe
     { pos: [4.3, 4.1, 6.7], target: [0.0, 3.0, 0.0] },
     { pos: [-3.6, 4.9, 3.6], target: [-1.4, 5.1, 3.2] },
     { pos: [3.7, 3.6, 7.1], target: [-1.4, 3.6, 4.2] },
-    { pos: [-0.0, 3.0, 0.0], target: [0.0, 3.0, 0.0] },
+    { pos: [1.2, 3.7, 2.4], target: [2.6, 4.0, -0.3] },
   ],
   library: [
     { pos: [-0.04, 6.66, 11.82], target: [0.00, 4.00, 1.00] },
@@ -270,8 +270,9 @@ export default function PalaceRoomView({
         setActiveObjectIdx(objectIndex);
         return prev;
       }
-      pendingObjectIdxRef.current = objectIndex;
-      return roomIndex;
+      // Cross-room — use fade transition
+      triggerFadeTransition(roomIndex, objectIndex);
+      return prev; // don't change yet; fade handler will
     });
   }, []);
 
@@ -713,18 +714,7 @@ export default function PalaceRoomView({
           isTestMode={false}
           currentTestQuestion={undefined}
           rooms={rooms}
-          onNavigate={useCallback((roomIndex: number, objectIndex: number) => {
-            console.log('[NAV] onNavigate called:', { roomIndex, objectIndex });
-            setActiveRoomIdx(prev => {
-              if (prev === roomIndex) {
-                setActiveObjectIdx(objectIndex);
-                return prev;
-              }
-              // Cross-room — use fade transition
-              triggerFadeTransition(roomIndex, objectIndex);
-              return prev; // don't change yet; fade handler will
-            });
-          }, [])}
+          onNavigate={handleNavigate}
         />
       )}
     </div>

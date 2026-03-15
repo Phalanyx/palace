@@ -139,10 +139,10 @@ export function DynamicObject({ objectData, position, forceOpen = false, onClose
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'rgba(255,255,255,0.07)',
-              backdropFilter: 'blur(16px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-              border: '1px solid rgba(255,255,255,0.15)',
+              background: 'rgba(0,0,0,0.55)',
+              backdropFilter: 'blur(20px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+              border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: '16px',
               padding: '14px 18px',
               width: '260px',
