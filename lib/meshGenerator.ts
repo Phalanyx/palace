@@ -73,10 +73,24 @@ GEOMETRY RULES:
 
 MATERIAL & COLOR RULES:
 - Use THREE.MeshPhysicalMaterial on every mesh.
-- Set a bright neon \`emissive\` color with emissiveIntensity between 2.0 and 3.0 for a glowing look.
-- Use 2-3 contrasting neon colors across the model's parts for visual pop. Pick from: 0xff00ff (magenta), 0x00ffff (cyan), 0xccff00 (lime), 0xff6600 (orange), 0x00ff88 (green), 0xff0088 (pink), 0xaa00ff (purple), 0xffff00 (yellow).
+- Set a bright \`emissive\` color with emissiveIntensity between 2.0 and 3.0 for a glowing look.
+- Use 2-3 contrasting colors across the model's parts for visual pop. You MUST ONLY pick from this exact palette:
+  • 0x3F6F5C (Forest Green)
+  • 0x6F8F63 (Moss Green)
+  • 0x1F3E3A (Deep Teal)
+  • 0xC8B896 (Muted Sand)
+  • 0x6A6E73 (Stone Gray)
+  • 0x7C5A74 (Tent Purple)
+  • 0xF2A65A (Fire Orange)
+  • 0xFFD27A (Ember Yellow)
+  • 0xA3D4D4 (Frost Teal)
+  • 0x3A8B8B (Deep Cyan)
+  • 0xC4C48E (Olive Sand)
+  • 0xD4585C (Flag Red)
+  • 0x4A72B0 (Flag Blue)
+  Do NOT use any colors outside this palette. No neon magenta, cyan, lime, pink, etc.
 - Set roughness: 0.15, metalness: 0.6 for a sleek, slightly reflective surface.
-- The main body should be one color, with accent parts in a contrasting color.
+- The main body should be one color, with accent parts in a contrasting color from the same palette.
 
 SIZE & POSITION:
 - The entire assembled model must fit within a 1.5 × 1.5 × 1.5 bounding box centered at the origin (0, 0, 0).
