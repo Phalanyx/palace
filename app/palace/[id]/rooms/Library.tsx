@@ -9,8 +9,8 @@ const LIBRARY_SLOTS: [number, number, number][] = [
   [0, 4.5, 4],         // Floating in front of the central monument
   [-6, 8.5, 2],        // On the left mezzanine
   [6, 8.5, 2],         // On the right mezzanine
-  [-2.5, 2.5, 4],      // On the left reading desk
-  [2.5, 2.5, 4]        // On the right reading desk
+  [-3, 2.5, -4],       // On the left back table
+  [3, 2.5, -4]         // On the right back table
 ];
 
 export function Library({ objects = [], activeObjectIdx = -1, onCloseObject, onObjectOpen, onObjectClose, mode = 'learn' }: { objects?: any[]; activeObjectIdx?: number; onCloseObject?: () => void; onObjectOpen?: (id: string) => void; onObjectClose?: (id: string) => void; mode?: 'learn' | 'test' }) {

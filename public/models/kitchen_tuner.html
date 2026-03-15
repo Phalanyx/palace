@@ -3,7 +3,7 @@
 <head>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #1e2a22; overflow: hidden; }
+body { background: #0a0a12; overflow: hidden; }
 canvas { display: block; }
 #hud { position: fixed; top: 14px; left: 14px; background: rgba(0,0,0,0.75); color: #00ff88; font-family: monospace; font-size: 13px; padding: 10px 14px; border-radius: 8px; line-height: 1.8; pointer-events: none; border: 1px solid rgba(0,255,136,0.2); }
 #hud span { color: #fff; }
@@ -32,11 +32,11 @@ const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x1e2a22);
 scene.fog=new THREE.FogExp2(0x1e2a22,0.016);
 const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,200);
-const R=new THREE.WebGLRenderer({antialias:true});
-R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));
-R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
-R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.2;
-document.body.appendChild(R.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+document.body.appendChild(renderer.domElement);
 
 const C={
 stoneL:0x6a7a72,stoneM:0x4a5a52,stoneD:0x3a4a42,wallBase:0x4a5a4a,wallD:0x2a3a2e,
@@ -334,65 +334,78 @@ const f3=new THREE.PointLight(0xffaa55,1.5,15);f3.position.set(4,5,2);scene.add(
 const f4=new THREE.PointLight(0xff8844,1,12);f4.position.set(0,3,4);scene.add(f4);
 const cF=new THREE.DirectionalLight(0x4a6a5a,.3);cF.position.set(0,8,10);scene.add(cF);
 
+// ====== SLOT MARKERS ======
+const slots = [
+  { id: 0, pos: [0, 2.8, 2.5] },
+  { id: 1, pos: [-5.5, 2.6, 3.5] },
+  { id: 2, pos: [6, 3, 3] },
+  { id: 3, pos: [-4.5, 3.3, -3] }
+];
+
+slots.forEach(slot => {
+  // Magenta sphere marker
+  const markerGeo = new THREE.SphereGeometry(0.35, 12, 10);
+  const markerMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.6 });
+  const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(slot.pos[0], slot.pos[1], slot.pos[2]);
+  scene.add(marker);
+
+  // Sprite label
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ff00ff';
+  ctx.beginPath();
+  ctx.arc(32, 32, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 36px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(slot.id), 32, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.position.set(slot.pos[0], slot.pos[1] + 0.7, slot.pos[2]);
+  sprite.scale.set(0.8, 0.8, 1);
+  scene.add(sprite);
+});
+
+// ====== SLOT PANEL ======
+const slotsPanel = document.getElementById('slots-panel');
+slots.forEach(slot => {
+  const div = document.createElement('div');
+  div.textContent = 'Slot ' + slot.id + ': [' + slot.pos.join(', ') + ']';
+  div.addEventListener('click', () => {
+    controls.target.set(slot.pos[0], slot.pos[1], slot.pos[2]);
+  });
+  slotsPanel.appendChild(div);
+});
+
 // ====== ORBIT CONTROLS ======
 camera.position.set(0, 12, 18);
-const controls = new THREE.OrbitControls(camera, R.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 3.5, 0);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.update();
 
-// ====== SLOT MARKERS ======
-const slotPositions = [
-  [0, 2.8, 2.5],       // Floating above the main prep table
-  [-5.5, 2.6, 3.5],    // Floating above the side table
-  [6, 3, 3],           // On top of the barrels
-  [0, 8.5, -7],        // On top of the hearth
-  [-4.5, 3.3, -3]      // Floating above the cauldron
-];
-
-const markerMat = new THREE.MeshBasicMaterial({color: 0xff00ff, transparent: true, opacity: 0.6});
-const markerGeo = new THREE.SphereGeometry(0.35, 12, 8);
-
-slotPositions.forEach(function(pos, idx) {
-  const marker = new THREE.Mesh(markerGeo, markerMat);
-  marker.position.set(pos[0], pos[1], pos[2]);
-  scene.add(marker);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ff00ff';
-  ctx.font = 'bold 48px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(idx), 32, 32);
-  const tex = new THREE.CanvasTexture(canvas);
-  const spriteMat = new THREE.SpriteMaterial({map: tex, depthTest: false});
-  const sprite = new THREE.Sprite(spriteMat);
-  sprite.position.set(pos[0], pos[1] + 0.7, pos[2]);
-  sprite.scale.set(0.8, 0.8, 1);
-  scene.add(sprite);
-});
-
-// ====== SLOTS PANEL ======
-const slotsPanel = document.getElementById('slots-panel');
-slotPositions.forEach(function(pos, idx) {
-  const div = document.createElement('div');
-  div.textContent = 'Slot ' + idx + ': [' + pos.join(', ') + ']';
-  div.addEventListener('click', function() {
-    controls.target.set(pos[0], pos[1], pos[2]);
-    controls.update();
-  });
-  slotsPanel.appendChild(div);
-});
+// ====== HUD UPDATE ======
+function updateHUD() {
+  document.getElementById('px').textContent = camera.position.x.toFixed(2);
+  document.getElementById('py').textContent = camera.position.y.toFixed(2);
+  document.getElementById('pz').textContent = camera.position.z.toFixed(2);
+  document.getElementById('tx').textContent = controls.target.x.toFixed(2);
+  document.getElementById('ty').textContent = controls.target.y.toFixed(2);
+  document.getElementById('tz').textContent = controls.target.z.toFixed(2);
+}
 
 // ====== COPY KEYFRAME ======
 function copyKeyframe() {
   const p = camera.position;
   const t = controls.target;
-  const fmt = v => Math.round(v * 100) / 100;
-  const text = '{ pos: [' + fmt(p.x) + ', ' + fmt(p.y) + ', ' + fmt(p.z) + '], target: [' + fmt(t.x) + ', ' + fmt(t.y) + ', ' + fmt(t.z) + '] }';
+  const text = '{ pos: [' + p.x.toFixed(2) + ', ' + p.y.toFixed(2) + ', ' + p.z.toFixed(2) + '], target: [' + t.x.toFixed(2) + ', ' + t.y.toFixed(2) + ', ' + t.z.toFixed(2) + '] }';
   navigator.clipboard.writeText(text).then(() => {
     const el = document.getElementById('copied');
     el.style.opacity = '1';
@@ -406,16 +419,10 @@ const clock=new THREE.Clock();
 function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
 fl.forEach(f=>{const n=f.idx||0;if(f.light){const b=f.baseIntensity||1;f.light.intensity=b+Math.sin(t*7+n)*b*.18+Math.sin(t*13+n*2)*b*.12;}if(f.flame){f.flame.scale.y=1.5+Math.sin(t*9+n)*.4;f.flame.scale.x=1+Math.sin(t*7+n*3)*.2;}});
 controls.update();
-// HUD update
-document.getElementById('px').textContent = camera.position.x.toFixed(2);
-document.getElementById('py').textContent = camera.position.y.toFixed(2);
-document.getElementById('pz').textContent = camera.position.z.toFixed(2);
-document.getElementById('tx').textContent = controls.target.x.toFixed(2);
-document.getElementById('ty').textContent = controls.target.y.toFixed(2);
-document.getElementById('tz').textContent = controls.target.z.toFixed(2);
-R.render(scene,camera);}
+updateHUD();
+renderer.render(scene,camera);}
 animate();
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();R.setSize(innerWidth,innerHeight);});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 </script>
 </body>
 </html>

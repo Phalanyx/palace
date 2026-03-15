@@ -7,7 +7,6 @@ import { DynamicObject } from '../DynamicObject';
 
 const BEDROOM_SLOTS: [number, number, number][] = [
   [-1.5, 3.5, -2],     // On the bed
-  [-3.8, 2.5, -2],     // On the nightstand
   [5.5, 3.5, 1.5],     // Floating near the armor
   [-5, 2, 4],          // On the chair
   [6, 5, -5]           // On the bookshelf
@@ -294,7 +293,7 @@ export function Bedroom({ objects = [], activeObjectIdx = -1, onCloseObject, onO
       <primitive object={group} />
 
       {/* Dynamic Objects */}
-      {objects.slice(0, 5).map((obj, i) => (
+      {objects.slice(0, 4).map((obj, i) => (
         <DynamicObject key={obj.id} objectData={obj} position={BEDROOM_SLOTS[i]} forceOpen={i === activeObjectIdx} onClose={onCloseObject} onObjectOpen={onObjectOpen} onObjectClose={onObjectClose} mode={mode} />
       ))}
     </>
