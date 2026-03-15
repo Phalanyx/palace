@@ -112,19 +112,50 @@ const ROOM_ORBIT = {
 
 const ROOM_SLOTS: Record<string, [number, number, number][]> = {
   bedroom: [
-    [-1.5, 3.5, -2], [-3.8, 2.5, -2], [5.5, 3.5, 1.5], [-5, 2, 4], [6, 5, -5],
+    [-1.5, 3.5, -2], [5.5, 3.5, 1.5], [-5, 2, 4], [6, 5, -5],
   ],
   great_hall: [
-    [0, 5, -8], [-3, 2.5, 3], [3, 2.5, 3], [-7, 5, -2], [7, 5, -2],
+    [0, 6, -6.5], [-3, 2.5, 3], [3, 2.5, 3], [-7, 5, -2], [7, 5, -2],
   ],
   kitchen: [
-    [0, 2.8, 2.5], [-5.5, 2.6, 3.5], [6, 3, 3], [0, 8.5, -7], [-4.5, 3.3, -3],
+    [0, 2.8, 2.5], [-5.5, 2.6, 3.5], [6, 3, 3], [-4.5, 3.3, -3],
   ],
   library: [
-    [0, 4.5, 4], [-6, 8.5, 2], [6, 8.5, 2], [-2.5, 2.5, 4], [2.5, 2.5, 4],
+    [0, 4.5, 4], [-6, 8.5, 2], [6, 8.5, 2], [-3, 2.5, -4], [3, 2.5, -4],
   ],
   dungeon: [
     [-2, 3.5, 0.5], [-4.5, 3, -3.5], [4.5, 3, -3.5], [0, 4.5, -4.3], [3.5, 4.5, 2],
+  ],
+};
+
+// Per-slot camera keyframes (from tuners). When present, overrides computeStandpoint.
+const ROOM_SLOT_KEYFRAMES: Record<string, { pos: [number, number, number]; target: [number, number, number] }[]> = {
+  kitchen: [
+    { pos: [0.27, 4.85, 12.47], target: [0.00, 3.50, 0.00] },
+    { pos: [2.90, 3.85, 12.45], target: [-5.46, 2.56, 3.19] },
+    { pos: [-2.81, 3.86, 9.04], target: [3.60, 3.38, 4.44] },
+    { pos: [-1.91, 6.42, 9.22], target: [-2.96, 5.15, 4.52] },
+  ],
+  bedroom: [
+    { pos: [4.3, 4.1, 6.7], target: [0.0, 3.0, 0.0] },
+    { pos: [-3.6, 4.9, 3.6], target: [-1.4, 5.1, 3.2] },
+    { pos: [3.7, 3.6, 7.1], target: [-1.4, 3.6, 4.2] },
+    { pos: [-0.0, 3.0, 0.0], target: [0.0, 3.0, 0.0] },
+  ],
+  library: [
+    { pos: [-0.04, 6.66, 11.82], target: [0.00, 4.00, 1.00] },
+    { pos: [2.26, 9.09, 4.11], target: [-2.91, 8.16, 2.72] },
+    { pos: [-2.57, 9.73, 5.67], target: [2.31, 9.03, 3.38] },
+    { pos: [-2.73, 3.23, 2.23], target: [-2.82, 3.14, 1.42] },
+    { pos: [3.23, 3.23, 2.01], target: [3.27, 3.07, 0.35] },
+  ],
+  great_hall: [
+    { pos: [-0.06, 5.36, 4.41], target: [0.13, 5.72, -1.21] },
+    { pos: [1.76, 2.7, 14.69], target: [-2.8, 4.12, 1.34] },
+    { pos: [-2.73, 4.66, 12.69], target: [0.72, 3.8, 6.33] },
+    { pos: [6.04, 5.16, 5.35], target: [-3.87, 4.16, -0.49] },
+    { pos: [-2.49, 4.93, -1.54], target: [-0.4, 4.84, -1.9] },
+    { pos: [-2.9, 4.28, -1.82], target: [2.35, 5.2, -2.23] },
   ],
 };
 
@@ -265,10 +296,17 @@ export default function PalaceRoomView({
 
   useEffect(() => {
     if (slots[activeObjectIdx] && activeRoom) {
-      const [x, y, z] = slots[activeObjectIdx];
-      cameraTargetRef.current.set(x, y, z);
-      const sp = computeStandpoint(activeRoom.roomKey, slots[activeObjectIdx]);
-      cameraPositionRef.current.set(...sp);
+      const keyframes = ROOM_SLOT_KEYFRAMES[activeRoom.roomKey];
+      if (keyframes && keyframes[activeObjectIdx]) {
+        const kf = keyframes[activeObjectIdx];
+        cameraTargetRef.current.set(...kf.target);
+        cameraPositionRef.current.set(...kf.pos);
+      } else {
+        const [x, y, z] = slots[activeObjectIdx];
+        cameraTargetRef.current.set(x, y, z);
+        const sp = computeStandpoint(activeRoom.roomKey, slots[activeObjectIdx]);
+        cameraPositionRef.current.set(...sp);
+      }
       setIsWalking(true);
     }
   }, [activeObjectIdx, activeRoomIdx]);

@@ -6,7 +6,7 @@ import { mat, matMetal, jitter, addMesh, makeTorch, animateFlicker, FlickerItem 
 import { DynamicObject } from '../DynamicObject';
 
 const GREAT_HALL_SLOTS: [number, number, number][] = [
-  [0, 5, -8],          // On the throne
+  [0, 6, -6.5],        // Above the throne
   [-3, 2.5, 3],        // On the left banquet table
   [3, 2.5, 3],         // On the right banquet table
   [-7, 5, -2],         // On the left balcony
