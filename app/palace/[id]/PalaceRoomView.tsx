@@ -61,26 +61,53 @@ const ROOM_COMPONENTS: Record<string, RoomFC> = {
   dungeon: Dungeon as RoomFC,
 };
 
-const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: [number, number, number]; exposure: number }> = {
-  bedroom: { position: [8, 6, 10], target: [0, 3, 0], exposure: 0.9 },
-  great_hall: { position: [0, 12, 26], target: [0, 4, -1], exposure: 0.85 },
-  kitchen: { position: [0, 7, 12], target: [0, 3.5, 0], exposure: 1.2 },
-  library: { position: [0, 8, 14], target: [0, 4, 1], exposure: 1.0 },
-  dungeon: { position: [0, 6, 14], target: [0, 2.8, 0], exposure: 1.15 },
+const WALK_LERP = 0.03; // camera position lerp (slow walk)
+const LOOK_LERP = 0.07; // camera target lerp (head turn)
+
+const STANDOFF = 10;
+const CAM_Y_OFFSET = 1.5;
+const WALL_MARGIN = 1.5;
+
+const ROOM_BOUNDS: Record<string, { halfX: number; halfZ: number }> = {
+  bedroom:    { halfX: 7, halfZ: 6 },
+  great_hall: { halfX: 14, halfZ: 9 },
+  kitchen:    { halfX: 8, halfZ: 7 },
+  library:    { halfX: 9, halfZ: 8 },
+  dungeon:    { halfX: 7, halfZ: 5 },
 };
 
-// Per-room orbit constraints — tuned to each room's size so the camera
-// never zooms out far enough to see roofs/outside walls.
-const ROOM_ORBIT: Record<string, {
-  minDistance: number; maxDistance: number;
-  minPolar: number; maxPolar: number;
-  minAzimuth: number; maxAzimuth: number;
-}> = {
-  bedroom:    { minDistance: 6,  maxDistance: 16, minPolar: 0.6, maxPolar: Math.PI / 2.4, minAzimuth: -Math.PI / 4, maxAzimuth: Math.PI / 4 },
-  great_hall: { minDistance: 8,  maxDistance: 30, minPolar: 0.4, maxPolar: Math.PI / 2.2, minAzimuth: -Math.PI / 3, maxAzimuth: Math.PI / 3 },
-  kitchen:    { minDistance: 6,  maxDistance: 20, minPolar: 0.5, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 4, maxAzimuth: Math.PI / 4 },
-  library:    { minDistance: 7,  maxDistance: 24, minPolar: 0.45, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 3.5, maxAzimuth: Math.PI / 3.5 },
-  dungeon:    { minDistance: 5,  maxDistance: 18, minPolar: 0.5, maxPolar: Math.PI / 2.3, minAzimuth: -Math.PI / 3, maxAzimuth: Math.PI / 3 },
+function computeStandpoint(roomKey: string, slot: [number, number, number]): [number, number, number] {
+  const [ox, oy, oz] = slot;
+  let dx = -ox, dz = -oz;
+  const len = Math.sqrt(dx * dx + dz * dz);
+  if (len < 0.5) { dx = 0; dz = 1; } else { dx /= len; dz /= len; }
+  let cx = ox + dx * STANDOFF;
+  let cz = oz + dz * STANDOFF;
+  const cy = oy + CAM_Y_OFFSET;
+  const bounds = ROOM_BOUNDS[roomKey];
+  if (bounds) {
+    const maxX = bounds.halfX - WALL_MARGIN;
+    const maxZ = bounds.halfZ - WALL_MARGIN;
+    cx = Math.max(-maxX, Math.min(maxX, cx));
+    cz = Math.max(-maxZ, Math.min(maxZ, cz));
+  }
+  return [cx, cy, cz];
+}
+
+const ROOM_CAMERA: Record<string, { position: [number, number, number]; target: [number, number, number]; exposure: number }> = {
+  bedroom:    { position: [0, 1.6, 5],   target: [-1.5, 3.5, -2], exposure: 0.9 },
+  great_hall: { position: [0, 1.6, 8],   target: [0, 5, -8],      exposure: 0.85 },
+  kitchen:    { position: [0, 1.6, 5],   target: [0, 2.8, 2.5],   exposure: 1.2 },
+  library:    { position: [0, 1.6, 6],   target: [0, 4.5, 4],     exposure: 1.0 },
+  dungeon:    { position: [0, 1.6, 3.5], target: [-2, 3.5, 0.5],  exposure: 1.15 },
+};
+
+// Tight first-person orbit constraints — head-turning only
+const ROOM_ORBIT = {
+  minPolar: 0.5,
+  maxPolar: Math.PI / 1.5,
+  minAzimuth: -Math.PI / 3,
+  maxAzimuth: Math.PI / 3,
 };
 
 const ROOM_SLOTS: Record<string, [number, number, number][]> = {
@@ -101,11 +128,42 @@ const ROOM_SLOTS: Record<string, [number, number, number][]> = {
   ],
 };
 
-function CameraTargetAnimator({ target, controlsRef }: { target: THREE.Vector3; controlsRef: React.RefObject<any> }) {
-  useFrame(() => {
+function FirstPersonCamera({
+  targetPosition,
+  targetLookAt,
+  controlsRef,
+  onWalkingChange,
+}: {
+  targetPosition: THREE.Vector3;
+  targetLookAt: THREE.Vector3;
+  controlsRef: React.RefObject<any>;
+  onWalkingChange: (walking: boolean) => void;
+}) {
+  const wasWalking = useRef(true);
+  useFrame(({ camera }) => {
     if (!controlsRef.current) return;
-    controlsRef.current.target.lerp(target, 0.07);
-    controlsRef.current.update();
+    // Lerp camera position toward standpoint
+    camera.position.lerp(targetPosition, WALK_LERP);
+    // Lerp the look-at target
+    controlsRef.current.target.lerp(targetLookAt, LOOK_LERP);
+
+    const dist = camera.position.distanceTo(targetPosition);
+    const walking = dist > 0.15;
+
+    if (walking) {
+      // During walk: manually orient camera — do NOT call OrbitControls.update()
+      // because it recalculates camera position from its internal spherical state,
+      // completely overriding our lerped position.
+      camera.lookAt(controlsRef.current.target);
+    } else {
+      // Stationary: let OrbitControls manage orientation (head-turning)
+      controlsRef.current.update();
+    }
+
+    if (walking !== wasWalking.current) {
+      wasWalking.current = walking;
+      onWalkingChange(walking);
+    }
   });
   return null;
 }
@@ -155,16 +213,19 @@ export default function PalaceRoomView({
   const [scorePct, setScorePct] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openObjectIds, setOpenObjectIds] = useState<Set<string>>(new Set());
+  const [fadePhase, setFadePhase] = useState<'idle' | 'out' | 'in'>('idle');
+  const [isWalking, setIsWalking] = useState(false);
   const controlsRef = useRef<any>(null);
   const cameraTargetRef = useRef(new THREE.Vector3(0, 3, 0));
+  const cameraPositionRef = useRef(new THREE.Vector3(0, 1.6, 5));
   const pendingObjectIdxRef = useRef<number | null>(null);
+  const pendingTransition = useRef<{ roomIdx: number; objectIdx: number } | null>(null);
 
   const activeRoom = rooms[activeRoomIdx];
   const objects = activeRoom?.objects ?? [];
   const currentObj = objects[activeObjectIdx];
   const RoomComponent = activeRoom ? ROOM_COMPONENTS[activeRoom.roomKey] : null;
   const cameraConfig = activeRoom ? ROOM_CAMERA[activeRoom.roomKey] : null;
-  const orbitConfig = activeRoom ? (ROOM_ORBIT[activeRoom.roomKey] ?? ROOM_ORBIT.great_hall) : ROOM_ORBIT.great_hall;
   const slots = activeRoom ? (ROOM_SLOTS[activeRoom.roomKey] || []) : [];
   const isTestMode = appPhase === 'test';
   const currentQuestion = isTestMode ? testQuestions.find(q => q.objectId === currentObj?.id) : null;
@@ -196,34 +257,60 @@ export default function PalaceRoomView({
     } else {
       setActiveObjectIdx(0);
     }
-    if (cameraConfig) cameraTargetRef.current.set(...cameraConfig.target);
+    if (cameraConfig) {
+      cameraTargetRef.current.set(...cameraConfig.target);
+      cameraPositionRef.current.set(...cameraConfig.position);
+    }
   }, [activeRoomIdx]);
 
   useEffect(() => {
-    if (slots[activeObjectIdx]) {
+    if (slots[activeObjectIdx] && activeRoom) {
       const [x, y, z] = slots[activeObjectIdx];
       cameraTargetRef.current.set(x, y, z);
+      const sp = computeStandpoint(activeRoom.roomKey, slots[activeObjectIdx]);
+      cameraPositionRef.current.set(...sp);
+      setIsWalking(true);
     }
   }, [activeObjectIdx, activeRoomIdx]);
 
+  function triggerFadeTransition(roomIdx: number, objectIdx: number) {
+    pendingTransition.current = { roomIdx, objectIdx };
+    setFadePhase('out');
+  }
+
+  function handleFadeEnd() {
+    if (fadePhase === 'out' && pendingTransition.current) {
+      const { roomIdx, objectIdx } = pendingTransition.current;
+      pendingTransition.current = null;
+      pendingObjectIdxRef.current = objectIdx;
+      setActiveRoomIdx(roomIdx);
+      requestAnimationFrame(() => setFadePhase('in'));
+      // Fallback in case onTransitionEnd doesn't fire for the fade-in
+      setTimeout(() => setFadePhase(prev => (prev === 'in' ? 'idle' : prev)), 450);
+    } else if (fadePhase === 'in') {
+      setFadePhase('idle');
+    }
+  }
+
   function handleRightArrow() {
+    if (fadePhase !== 'idle') return;
     if (appPhase === 'explore') {
       if (activeObjectIdx < objects.length - 1) setActiveObjectIdx(activeObjectIdx + 1);
-      else if (activeRoomIdx < rooms.length - 1) { setActiveRoomIdx(activeRoomIdx + 1); setActiveObjectIdx(0); }
+      else if (activeRoomIdx < rooms.length - 1) triggerFadeTransition(activeRoomIdx + 1, 0);
       else setAppPhase('ready_to_test');
     } else if (appPhase === 'test') {
       if (activeObjectIdx < objects.length - 1) setActiveObjectIdx(activeObjectIdx + 1);
-      else if (activeRoomIdx < rooms.length - 1) { setActiveRoomIdx(activeRoomIdx + 1); setActiveObjectIdx(0); }
+      else if (activeRoomIdx < rooms.length - 1) triggerFadeTransition(activeRoomIdx + 1, 0);
       else submitAnswers();
     }
   }
 
   function handleLeftArrow() {
+    if (fadePhase !== 'idle') return;
     if (activeObjectIdx > 0) setActiveObjectIdx(activeObjectIdx - 1);
     else if (activeRoomIdx > 0) {
       const prevRoom = rooms[activeRoomIdx - 1];
-      setActiveRoomIdx(activeRoomIdx - 1);
-      setActiveObjectIdx((prevRoom?.objects?.length ?? 1) - 1);
+      triggerFadeTransition(activeRoomIdx - 1, (prevRoom?.objects?.length ?? 1) - 1);
     }
   }
 
@@ -286,7 +373,7 @@ export default function PalaceRoomView({
       <Canvas
         key={activeRoom?.roomKey}
         shadows
-        camera={{ position: cameraConfig?.position || [12, 10, 14], fov: 50, near: 0.1, far: 200 }}
+        camera={{ position: cameraConfig?.position || [0, 1.6, 5], fov: 60, near: 0.8, far: 200 }}
         gl={{ antialias: true, toneMapping: 4, toneMappingExposure: cameraConfig?.exposure ?? 1.0 }}
         style={{ width: '100%', height: '100%' }}
       >
@@ -306,14 +393,19 @@ export default function PalaceRoomView({
           enableDamping
           dampingFactor={0.08}
           enablePan={false}
-          minDistance={orbitConfig.minDistance}
-          maxDistance={orbitConfig.maxDistance}
-          minPolarAngle={orbitConfig.minPolar}
-          maxPolarAngle={orbitConfig.maxPolar}
-          minAzimuthAngle={orbitConfig.minAzimuth}
-          maxAzimuthAngle={orbitConfig.maxAzimuth}
+          enableZoom={false}
+          enableRotate={!isWalking}
+          minPolarAngle={ROOM_ORBIT.minPolar}
+          maxPolarAngle={ROOM_ORBIT.maxPolar}
+          minAzimuthAngle={ROOM_ORBIT.minAzimuth}
+          maxAzimuthAngle={ROOM_ORBIT.maxAzimuth}
         />
-        <CameraTargetAnimator target={cameraTargetRef.current} controlsRef={controlsRef} />
+        <FirstPersonCamera
+          targetPosition={cameraPositionRef.current}
+          targetLookAt={cameraTargetRef.current}
+          controlsRef={controlsRef}
+          onWalkingChange={setIsWalking}
+        />
       </Canvas>
     </div>
   );
@@ -452,6 +544,12 @@ export default function PalaceRoomView({
   return (
     <div className="relative w-full h-full">
       {canvasBackdrop}
+      {/* Fade overlay for room transitions */}
+      <div
+        className="absolute inset-0 z-50 bg-black pointer-events-none transition-opacity duration-[400ms]"
+        style={{ opacity: fadePhase === 'out' ? 1 : 0 }}
+        onTransitionEnd={handleFadeEnd}
+      />
       {topHud}
 
       {/* Phase overlays (ready_to_test, grading, results) */}
@@ -463,7 +561,7 @@ export default function PalaceRoomView({
           {/* Left arrow */}
           <button
             onClick={handleLeftArrow}
-            disabled={isAtStart}
+            disabled={isAtStart || fadePhase !== 'idle'}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/15 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center hover:bg-white/25 disabled:opacity-20 transition-all"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -472,7 +570,8 @@ export default function PalaceRoomView({
           {/* Right arrow */}
           <button
             onClick={handleRightArrow}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/15 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center hover:bg-white/25 transition-all"
+            disabled={fadePhase !== 'idle'}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/15 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center hover:bg-white/25 disabled:opacity-20 transition-all"
             title={!isTestMode && isAtEnd ? 'Ready to Test' : 'Next'}
           >
             <ChevronRight className="w-6 h-6" />
@@ -550,13 +649,12 @@ export default function PalaceRoomView({
             console.log('[NAV] onNavigate called:', { roomIndex, objectIndex });
             setActiveRoomIdx(prev => {
               if (prev === roomIndex) {
-                // Same room — set object directly
                 setActiveObjectIdx(objectIndex);
                 return prev;
               }
-              // Different room — stash object for the effect
-              pendingObjectIdxRef.current = objectIndex;
-              return roomIndex;
+              // Cross-room — use fade transition
+              triggerFadeTransition(roomIndex, objectIndex);
+              return prev; // don't change yet; fade handler will
             });
           }, [])}
         />

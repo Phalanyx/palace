@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a12; overflow: hidden; }
+canvas { display: block; }
+#hud { position: fixed; top: 14px; left: 14px; background: rgba(0,0,0,0.75); color: #00ff88; font-family: monospace; font-size: 13px; padding: 10px 14px; border-radius: 8px; line-height: 1.8; pointer-events: none; border: 1px solid rgba(0,255,136,0.2); }
+#hud span { color: #fff; }
+#copy { position: fixed; top: 14px; right: 14px; background: #1a1a2e; color: #00ff88; font-family: monospace; font-size: 12px; padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(0,255,136,0.3); cursor: pointer; }
+#copy:hover { background: #252540; }
+#copied { position: fixed; top: 54px; right: 14px; color: #00ff88; font-family: monospace; font-size: 11px; opacity: 0; transition: opacity 0.3s; }
+#slots-panel { position: fixed; top: 90px; left: 14px; background: rgba(0,0,0,0.75); color: #ff00ff; font-family: monospace; font-size: 12px; padding: 10px 14px; border-radius: 8px; line-height: 1.6; border: 1px solid rgba(255,0,255,0.2); }
+#slots-panel div { cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+#slots-panel div:hover { background: rgba(255,0,255,0.2); }
+#info { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); color: #666; font-family: monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="hud">
+  pos:    [<span id="px">0</span>, <span id="py">0</span>, <span id="pz">0</span>]<br>
+  target: [<span id="tx">0</span>, <span id="ty">0</span>, <span id="tz">0</span>]
+</div>
+<button id="copy" onclick="copyKeyframe()">Copy keyframe</button>
+<div id="copied">Copied!</div>
+<div id="slots-panel"></div>
+<div id="info">drag to orbit · scroll to zoom · right-drag to pan</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x12101a);
+scene.fog=new THREE.FogExp2(0x12101a,0.015);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,200);
+camera.position.set(0, 12, 20);
+const R=new THREE.WebGLRenderer({antialias:true});
+R.setSize(innerWidth,innerHeight);R.setPixelRatio(Math.min(devicePixelRatio,2));
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.0;
+document.body.appendChild(R.domElement);
+
+// OrbitControls
+const controls = new THREE.OrbitControls(camera, R.domElement);
+controls.target.set(0, 4, 1);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.update();
+
+const C={
+sL:0x8a7a6a,sM:0x5a4a3e,sD:0x3a3030,sDD:0x2a2222,
+wb:0x4a3a32,wd:0x2a2018,
+w:0x5a3a28,wD:0x3a2218,wL:0x6a4a32,wM:0x4a3020,wR:0x7a5a3a,
+go:0x8a7a3a,goL:0xaa9a4a,
+ir:0x2e2e30,brass:0x8a7a4a,
+red:0x8a2a1a,redD:0x6a1a0a,redL:0xaa3a1a,redBright:0xcc4422,
+gold:0xaa8a3a,goldL:0xccaa4a,
+crystal:0x4a8acc,crystalL:0x6aaaee,crystalGlow:0x3a7abb,
+parch:0x9a8a6a,
+leather:0x5a3a2a,
+};
+const bkC=[0x8a3a3a,0x3a4a7a,0x5a7a3a,0x7a5a2a,0x6a3a5a,0x3a6a6a,0x7a4a1a,0x4a3a6a,0x8a6a2a,0x5a3a3a,0xaa6a3a,0x3a5a4a,0x9a5a6a,0x6a6a2a,0xcc8844,0x4488aa];
+
+function mt(c){return new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.8,metalness:.05})}
+function mm(c){return new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.35,metalness:.6})}
+function glow(c,i){return new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:i||1})}
+function J(g,a){a=a||.05;const p=g.attributes.position;for(let i=0;i<p.count;i++){p.setX(i,p.getX(i)+(Math.random()-.5)*a);p.setY(i,p.getY(i)+(Math.random()-.5)*a);p.setZ(i,p.getZ(i)+(Math.random()-.5)*a);}p.needsUpdate=true;g.computeVertexNormals();return g;}
+function A(geo,mat,x,y,z,rx,ry,rz,sx,sy,sz,par){
+const m=new THREE.Mesh(geo,mat);m.position.set(x||0,y||0,z||0);
+if(rx)m.rotation.x=rx;if(ry)m.rotation.y=ry;if(rz)m.rotation.z=rz;
+if(sx||sy||sz)m.scale.set(sx||1,sy||1,sz||1);
+m.castShadow=true;m.receiveShadow=true;(par||scene).add(m);return m;}
+
+const RW=18,RH=12,RD=16,fl=[];
+
+// ====== FLOOR ======
+A(J(new THREE.BoxGeometry(RW,.4,RD,6,1,5),.06),mt(C.sDD),0,-.2,0);
+for(let ix=-4;ix<=4;ix++)for(let iz=-3;iz<=3;iz++)
+A(J(new THREE.BoxGeometry(1.8+Math.random()*.3,.05,1.8+Math.random()*.3,2,1,2),.02),mt((ix+iz)%2===0?C.sD:C.sDD),ix*2,.03,iz*2.2);
+
+// ====== WALLS ======
+A(J(new THREE.BoxGeometry(RW,RH,.7,6,4,1),.06),mt(C.sD),0,RH/2,-RD/2);
+A(J(new THREE.BoxGeometry(.7,RH,RD,1,4,5),.06),mt(C.sD),-RW/2,RH/2,0);
+A(J(new THREE.BoxGeometry(.7,RH,RD,1,4,5),.06),mt(C.sD),RW/2,RH/2,0);
+A(new THREE.BoxGeometry(RW,.3,RD),mt(C.wd),0,RH+.15,0);
+
+// Dark stone bricks
+for(let w=0;w<3;w++)for(let i=0;i<35;i++){
+let bx,by,bz,ry=0;by=.3+Math.random()*(RH-1);
+if(w===0){bx=(Math.random()-.5)*(RW-2);bz=-RD/2+.45;}
+else if(w===1){bz=(Math.random()-.5)*(RD-2);bx=-RW/2+.45;ry=Math.PI/2;}
+else{bz=(Math.random()-.5)*(RD-2);bx=RW/2-.45;ry=Math.PI/2;}
+A(J(new THREE.BoxGeometry(.8+Math.random()*1.4,.3+Math.random()*.4,.12,2,1,1),.02),mt([0x3a3032,0x4a3a3a,0x2a2528,0x3a3538,0x4a4040][i%5]),bx,by,bz,0,ry);}
+
+// Beams - heavy wooden framework
+for(let z=-6;z<=6;z+=3)A(J(new THREE.BoxGeometry(RW-.5,.55,.5,6,1,1),.04),mt(C.wD),0,RH-.2,z);
+for(let x=-6;x<=6;x+=4)A(J(new THREE.BoxGeometry(.5,.5,RD-.5,1,1,5),.04),mt(C.wD),x,RH-.45,0);
+// Vertical wooden pillars
+for(let s=-1;s<=1;s+=2){
+for(let z=-5;z<=5;z+=5){
+A(J(new THREE.BoxGeometry(.4,RH,.4,1,4,1),.04),mt(C.wM),s*(RW/2-.5),RH/2,z);}}
+
+// ====== UPPER GALLERY / MEZZANINE (wraps all around) ======
+const mezH=6.5;
+const mezW=3;
+// Four sides of mezzanine
+// Left side
+A(J(new THREE.BoxGeometry(mezW,.25,RD-2,3,1,5),.04),mt(C.wD),-RW/2+mezW/2,mezH,0);
+// Right side
+A(J(new THREE.BoxGeometry(mezW,.25,RD-2,3,1,5),.04),mt(C.wD),RW/2-mezW/2,mezH,0);
+// Back side
+A(J(new THREE.BoxGeometry(RW-mezW*2,.25,mezW,4,1,2),.04),mt(C.wD),0,mezH,-RD/2+mezW/2);
+// Front side (with gap for open view / stairs)
+A(J(new THREE.BoxGeometry(3,.25,mezW,2,1,2),.04),mt(C.wD),-RW/2+mezW/2+1.5,mezH,RD/2-mezW/2);
+A(J(new THREE.BoxGeometry(3,.25,mezW,2,1,2),.04),mt(C.wD),RW/2-mezW/2-1.5,mezH,RD/2-mezW/2);
+
+// Inner railing all around
+// Left inner edge
+A(J(new THREE.BoxGeometry(.18,.12,RD-mezW*2),.03),mt(C.wL),-RW/2+mezW,mezH+1.1,0);
+for(let z=-6;z<=6;z+=2)A(new THREE.BoxGeometry(.12,.95,.12),mt(C.wM),-RW/2+mezW,mezH+.55,z);
+// Right inner edge
+A(J(new THREE.BoxGeometry(.18,.12,RD-mezW*2),.03),mt(C.wL),RW/2-mezW,mezH+1.1,0);
+for(let z=-6;z<=6;z+=2)A(new THREE.BoxGeometry(.12,.95,.12),mt(C.wM),RW/2-mezW,mezH+.55,z);
+// Back inner edge
+A(J(new THREE.BoxGeometry(RW-mezW*2,.12,.18),.03),mt(C.wL),0,mezH+1.1,-RD/2+mezW);
+for(let x=-5;x<=5;x+=2.5)A(new THREE.BoxGeometry(.12,.95,.12),mt(C.wM),x,mezH+.55,-RD/2+mezW);
+// Front inner edges (with gap)
+A(J(new THREE.BoxGeometry(3,.12,.18),.02),mt(C.wL),-RW/2+mezW/2+1.5,mezH+1.1,RD/2-mezW);
+A(J(new THREE.BoxGeometry(3,.12,.18),.02),mt(C.wL),RW/2-mezW/2-1.5,mezH+1.1,RD/2-mezW);
+for(let x=-8;x<=-5;x+=1.5)A(new THREE.BoxGeometry(.12,.95,.12),mt(C.wM),x,mezH+.55,RD/2-mezW);
+for(let x=5;x<=8;x+=1.5)A(new THREE.BoxGeometry(.12,.95,.12),mt(C.wM),x,mezH+.55,RD/2-mezW);
+
+// Support brackets under mezzanine
+for(let z=-5;z<=5;z+=3.3){
+A(J(new THREE.BoxGeometry(.5,.5,1),.03),mt(C.wD),-RW/2+1.5,mezH-.3,z);
+A(J(new THREE.BoxGeometry(.5,.5,1),.03),mt(C.wD),RW/2-1.5,mezH-.3,z);}
+for(let x=-4;x<=4;x+=4){
+A(J(new THREE.BoxGeometry(1,.5,.5),.03),mt(C.wD),x,mezH-.3,-RD/2+1.5);}
+
+// Books and stacks scattered on mezzanine
+function mkMezBooks(x,z){
+// Tall stack
+const n=3+Math.floor(Math.random()*5);
+for(let i=0;i<n;i++){const bw=.25+Math.random()*.2,bd=.18+Math.random()*.15,bh=.035+Math.random()*.02;
+A(new THREE.BoxGeometry(bw,bh,bd),mt(bkC[Math.floor(Math.random()*bkC.length)]),x+(Math.random()-.5)*.1,mezH+.13+i*(bh+.003),z+(Math.random()-.5)*.1,0,(Math.random()-.5)*.3);}}
+// Left mezzanine book piles
+mkMezBooks(-RW/2+1.5,-4);mkMezBooks(-RW/2+1.5,-1);mkMezBooks(-RW/2+2,2);
+mkMezBooks(-RW/2+1,4.5);mkMezBooks(-RW/2+2.2,0);mkMezBooks(-RW/2+1.3,5.5);
+// Right mezzanine book piles
+mkMezBooks(RW/2-1.5,-4);mkMezBooks(RW/2-1.5,-1);mkMezBooks(RW/2-2,2);
+mkMezBooks(RW/2-1,4.5);mkMezBooks(RW/2-2.2,0);mkMezBooks(RW/2-1.3,5.5);
+// Back mezzanine book piles
+mkMezBooks(-3,-RD/2+1.5);mkMezBooks(0,-RD/2+1.5);mkMezBooks(3,-RD/2+1.5);
+mkMezBooks(-5,-RD/2+2);mkMezBooks(5,-RD/2+2);
+// Some open books lying flat
+for(let i=0;i<6;i++){const ox=[-7,7,-6,6,-2,2][i],oz=[-3,-3,1,1,-6.5,-6.5][i];
+A(new THREE.BoxGeometry(.3,.02,.22),mt(bkC[Math.floor(Math.random()*bkC.length)]),ox,mezH+.14,oz,0,Math.random()*3);
+}
+// Leaning books against railing
+for(let i=0;i<4;i++){const side=i<2?-1:1;const z=-3+i*3;
+A(new THREE.BoxGeometry(.06,.35,.22),mt(bkC[Math.floor(Math.random()*bkC.length)]),side*(RW/2-mezW+.15),mezH+.3,z,0,0,(Math.random()-.3)*.4);}
+// Small reading desk on mezzanine (left)
+{const md=new THREE.Group();
+A(J(new THREE.BoxGeometry(.8,.08,.5),.01),mt(C.w),0,.9,0,0,0,0,0,0,0,md);
+for(let lx=-1;lx<=1;lx+=2)A(new THREE.BoxGeometry(.08,.9,.08),mt(C.wD),lx*.3,.45,0,0,0,0,0,0,0,md);
+A(new THREE.BoxGeometry(.4,.03,.3),mt(bkC[2]),0,.95,.05,0,.2,0,0,0,0,md);
+md.position.set(-RW/2+1.8,mezH,3);scene.add(md);}
+// Small reading desk on mezzanine (right)
+{const md=new THREE.Group();
+A(J(new THREE.BoxGeometry(.8,.08,.5),.01),mt(C.w),0,.9,0,0,0,0,0,0,0,md);
+for(let lx=-1;lx<=1;lx+=2)A(new THREE.BoxGeometry(.08,.9,.08),mt(C.wD),lx*.3,.45,0,0,0,0,0,0,0,md);
+A(new THREE.BoxGeometry(.4,.03,.3),mt(bkC[5]),0,.95,.05,0,-.3,0,0,0,0,md);
+md.position.set(RW/2-1.8,mezH,3);scene.add(md);}
+
+// ====== UPPER BOOKSHELVES (on mezzanine) ======
+function mkShelf(x,z,ry,rows,sw,sd){
+rows=rows||4;sw=sw||2.5;sd=sd||.6;
+const g=new THREE.Group();
+A(J(new THREE.BoxGeometry(sw,rows*1.1+.2,sd,2,rows,1),.03),mt(C.wD),0,(rows*1.1+.2)/2,0,0,0,0,0,0,0,g);
+for(let s=0;s<rows;s++){const sy=.2+s*1.1;
+A(new THREE.BoxGeometry(sw+.04,.08,sd+.04),mt(C.w),0,sy,0,0,0,0,0,0,0,g);
+let cx=-sw/2+.1;
+while(cx<sw/2-.1){const bw=.06+Math.random()*.08,bh=.55+Math.random()*.4;
+A(new THREE.BoxGeometry(bw,bh,sd-.15),mt(bkC[Math.floor(Math.random()*bkC.length)]),cx+bw/2,sy+.04+bh/2,sd/2-.15,0,0,(Math.random()-.5)*.05,0,0,0,g);
+cx+=bw+.008;if(Math.random()<.06)cx+=.08;}}
+A(J(new THREE.BoxGeometry(sw+.06,.12,sd+.06),.02),mt(C.w),0,rows*1.1+.2,0,0,0,0,0,0,0,g);
+g.position.set(x,0,z);g.rotation.y=ry||0;scene.add(g);return g;}
+
+// Upper level shelves (left) - placed on mezzanine floor
+for(let z=-5.5;z<=5.5;z+=2.8){const sh=mkShelf(-RW/2+1.2,z,Math.PI/2,3,2.2,.55);sh.position.y=mezH;}
+// Upper level shelves (right)
+for(let z=-5.5;z<=5.5;z+=2.8){const sh=mkShelf(RW/2-1.2,z,-Math.PI/2,3,2.2,.55);sh.position.y=mezH;}
+// Upper level shelves (back wall)
+for(let x=-5;x<=5;x+=3.5){const sh=mkShelf(x,-RD/2+1.2,0,3,2.8,.55);sh.position.y=mezH;}
+
+// ====== LOWER BOOKSHELVES ======
+// Back wall
+mkShelf(-6,-RD/2+1,0,5,3,.6);
+mkShelf(6,-RD/2+1,0,5,3,.6);
+mkShelf(0,-RD/2+1,0,5,3,.6);
+// Side walls lower (below mezzanine)
+for(let z=-5;z<=5;z+=2.8){mkShelf(-RW/2+1,z,Math.PI/2,5,2.4,.6);mkShelf(RW/2-1,z,-Math.PI/2,5,2.4,.6);}
+
+// ====== FLOOR BOOK STACKS (scattered piles) ======
+function mkBookPile(x,z,n){n=n||5;
+for(let i=0;i<n;i++){const bw=.3+Math.random()*.3,bd=.2+Math.random()*.2,bh=.04+Math.random()*.03;
+A(new THREE.BoxGeometry(bw,bh,bd),mt(bkC[Math.floor(Math.random()*bkC.length)]),x+(Math.random()-.5)*.15,.02+i*(bh+.005),z+(Math.random()-.5)*.15,0,(Math.random()-.5)*.3);}}
+mkBookPile(-4,2,6);mkBookPile(-3.5,2.5,4);mkBookPile(-5,3,5);
+mkBookPile(4,2,7);mkBookPile(3.5,3,4);mkBookPile(5,2.5,5);
+mkBookPile(-3,5,4);mkBookPile(3,5,3);mkBookPile(-2,6,5);mkBookPile(2,6,4);
+mkBookPile(-5,-3,6);mkBookPile(5,-3,5);mkBookPile(-4,0,4);mkBookPile(4,0,3);
+mkBookPile(-1,5.5,3);mkBookPile(1,5.5,4);
+mkBookPile(0,-4,5);mkBookPile(-2,-5,4);mkBookPile(2,-5,3);
+
+// ====== GRAND RED CARPET ======
+A(J(new THREE.BoxGeometry(7,.04,10,5,1,6),.03),mt(C.red),0,.15,0);
+A(J(new THREE.BoxGeometry(7.4,.03,10.4,5,1,6),.02),mt(C.gold),0,.12,0);
+// Inner carpet
+A(J(new THREE.BoxGeometry(5,.05,7,4,1,5),.02),mt(C.redD),0,.18,0);
+A(J(new THREE.BoxGeometry(5.3,.045,7.3,4,1,5),.02),mt(C.goldL),0,.16,0);
+
+// ====== CENTRAL ARCHWAY MONUMENT ======
+const arch=new THREE.Group();
+// Base platform (hexagonal feel)
+A(J(new THREE.CylinderGeometry(3,3.3,.5,6),.06),mt(C.sL),0,.25,0,0,0,0,0,0,0,arch);
+A(J(new THREE.CylinderGeometry(2.5,2.8,.3,6),.04),mt(C.sM),0,.55,0,0,Math.PI/6,0,0,0,0,arch);
+
+// Four main pillars
+for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2+Math.PI/4;
+const px=Math.cos(a)*1.8,pz=Math.sin(a)*1.8;
+// Pillar base
+A(J(new THREE.BoxGeometry(.8,.6,.8,1,1,1),.04),mt(C.sL),px,.9,pz,0,a,0,0,0,0,arch);
+// Pillar shaft
+A(J(new THREE.BoxGeometry(.5,4,.5,1,4,1),.04),mt(C.sL),px,3.2,pz,0,a,0,0,0,0,arch);
+// Pillar capital
+A(J(new THREE.BoxGeometry(.7,.4,.7,1,1,1),.03),mt(C.sM),px,5.4,pz,0,a,0,0,0,0,arch);}
+
+// Gothic arches connecting pillars
+for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2+Math.PI/4;
+const a2=((i+1)/4)*Math.PI*2+Math.PI/4;
+const mx=(Math.cos(a)+Math.cos(a2))/2*1.8;
+const mz=(Math.sin(a)+Math.sin(a2))/2*1.8;
+// Arch beam
+A(J(new THREE.BoxGeometry(2,.3,.25,2,1,1),.03),mt(C.sM),mx,5.6,mz,0,(a+a2)/2+Math.PI/2,0,0,0,0,arch);
+// Pointed arch top pieces
+for(let s=-1;s<=1;s+=2){
+A(J(new THREE.BoxGeometry(1.1,.25,.2),.02),mt(C.sL),mx+Math.cos((a+a2)/2+Math.PI/2)*s*.3,6.2+Math.abs(s)*.3,mz+Math.sin((a+a2)/2+Math.PI/2)*s*.3,0,(a+a2)/2+Math.PI/2,s*.35,0,0,0,arch);}
+// Keystone
+A(J(new THREE.BoxGeometry(.3,.35,.22),.02),mt(C.sM),mx*0.95,6.8,mz*0.95,0,(a+a2)/2+Math.PI/2,0,0,0,0,arch);}
+
+// Top spire frame
+A(J(new THREE.CylinderGeometry(.3,1.2,1.5,4),.06),mt(C.wR),0,7,0,0,Math.PI/4,0,0,0,0,arch);
+A(J(new THREE.CylinderGeometry(.05,.3,.8,4),.04),mt(C.wD),0,7.9,0,0,Math.PI/4,0,0,0,0,arch);
+
+// Central pedestal
+A(J(new THREE.BoxGeometry(1,.3,1),.03),mt(C.sM),0,.85,0,0,0,0,0,0,0,arch);
+A(J(new THREE.CylinderGeometry(.3,.4,1.2,6),.03),mt(C.sL),0,1.5,0,0,0,0,0,0,0,arch);
+A(J(new THREE.BoxGeometry(.7,.15,.7),.02),mt(C.sM),0,2.15,0,0,Math.PI/4,0,0,0,0,arch);
+
+// ====== CRYSTAL ======
+const crystalMat=new THREE.MeshStandardMaterial({color:0x2255aa,flatShading:true,roughness:.03,metalness:.75,transparent:true,opacity:.88,emissive:0x2266dd,emissiveIntensity:2.2});
+// Elongated drop-shaped gem: sphere geo with low segments for large visible facets, scaled taller
+const crys=A(J(new THREE.SphereGeometry(.88,8,6),.06),crystalMat,0,3.4,0,0,0,0,1,1.55,1,arch);
+// Crystal mid glow layer - bright blue
+const crystInner=A(new THREE.SphereGeometry(.62,7,5),new THREE.MeshBasicMaterial({color:0x66aaff,transparent:true,opacity:.75}),0,3.4,0,0,0,0,1,1.4,1,arch);
+// Crystal bright white-blue core
+const crystCore=A(new THREE.SphereGeometry(.32,6,5),new THREE.MeshBasicMaterial({color:0xddeeff,transparent:true,opacity:.97}),0,3.55,0,0,0,0,1,1.2,1,arch);
+// Tiny white hot center
+const crystHot=A(new THREE.SphereGeometry(.14,5,4),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1}),0,3.6,0,0,0,0,1,1,1,arch);
+
+arch.position.set(0,0,0);scene.add(arch);
+
+// Crystal light - strong blue-white
+const crystLight=new THREE.PointLight(0x88bbff,6,16);crystLight.position.set(0,3.8,0);scene.add(crystLight);
+// Secondary warm fill from below
+const crystLight2=new THREE.PointLight(0x4488ff,3,8);crystLight2.position.set(0,2.2,0);scene.add(crystLight2);
+
+// Small cyan orbs around archway
+for(let i=0;i<6;i++){const a=(i/6)*Math.PI*2;
+const ox=Math.cos(a)*2.2,oz=Math.sin(a)*2.2;
+A(new THREE.SphereGeometry(.06,4,3),glow(C.crystalL,.9),ox,5.8+Math.sin(a*2)*.2,oz,0,0,0,0,0,0,arch);
+const ol=new THREE.PointLight(C.crystal,.3,3);ol.position.set(ox,5.8,oz);arch.add(ol);}
+
+// ====== SMALL DESKS / READING SPOTS ======
+function mkSmallDesk(x,z,ry){const d=new THREE.Group();
+A(J(new THREE.BoxGeometry(1.2,.1,.8,2,1,1),.02),mt(C.w),0,1.2,0,0,0,0,0,0,0,d);
+for(let lx=-1;lx<=1;lx+=2)for(let lz=-1;lz<=1;lz+=2)
+A(new THREE.BoxGeometry(.1,1.2,.1),mt(C.wD),lx*.5,.6,lz*.3,0,0,0,0,0,0,d);
+// Books on desk
+for(let i=0;i<2;i++)A(new THREE.BoxGeometry(.25,.04,.18),mt(bkC[Math.floor(Math.random()*bkC.length)]),(Math.random()-.5)*.5,1.25+i*.045,(Math.random()-.5)*.3,0,Math.random()*.4,0,0,0,0,d);
+d.position.set(x,0,z);d.rotation.y=ry||0;scene.add(d);}
+mkSmallDesk(-4,4,0.2);mkSmallDesk(4,4,-0.2);
+mkSmallDesk(-3,-4,0.1);mkSmallDesk(3,-4,-0.1);
+
+// ====== STOOLS ======
+function mkStool(x,z){const s=new THREE.Group();
+A(J(new THREE.CylinderGeometry(.22,.2,.06,6),.01),mt(C.w),0,.7,0,0,0,0,0,0,0,s);
+for(let i=0;i<4;i++){const a=(i/4)*Math.PI*2;
+A(new THREE.CylinderGeometry(.03,.04,.68,4),mt(C.wD),Math.cos(a)*.14,.34,Math.sin(a)*.14,0,0,0,0,0,0,s);}
+s.position.set(x,0,z);scene.add(s);}
+mkStool(-4,4.8);mkStool(4,4.8);mkStool(-3,-4.8);mkStool(3,-4.8);
+
+// ====== SCROLL BOXES / CHESTS ======
+function mkChest(x,z,s){s=s||1;const ch=new THREE.Group();
+A(J(new THREE.BoxGeometry(1*s,.6*s,.6*s,2,1,1),.03),mt(C.wD),0,.3*s,0,0,0,0,0,0,0,ch);
+A(J(new THREE.BoxGeometry(1.02*s,.1*s,.62*s),.02),mt(C.wM),0,.62*s,0,0,0,0,0,0,0,ch);
+for(let b=-1;b<=1;b++)A(new THREE.BoxGeometry(.05,.6*s,.62*s),mm(C.ir),b*.35*s,.3*s,0,0,0,0,0,0,0,ch);
+A(new THREE.BoxGeometry(.1,.08,.04),mm(C.brass),0,.4*s,.32*s,0,0,0,0,0,0,ch);
+ch.position.set(x,0,z);scene.add(ch);}
+mkChest(-5,6);mkChest(5,6);mkChest(-6,-5,.8);mkChest(6,-5,.8);
+
+// ====== CANDLE CLUSTERS ======
+function mkCandles(x,y,z,n){n=n||3;for(let i=0;i<n;i++){const h=.12+Math.random()*.2;
+A(new THREE.CylinderGeometry(.02+Math.random()*.015,.03,h,5),mt(0xcacab0),x+(Math.random()-.5)*.12,y+h/2,z+(Math.random()-.5)*.12);
+const f=A(new THREE.SphereGeometry(.018,3,3),glow(C.candle),x+(Math.random()-.5)*.1,y+h+.015,z+(Math.random()-.5)*.1,0,0,0,1,1.5,1);
+fl.push({flame:f,idx:50+i+x*3});}}
+
+// Candles on floor near book piles (warm pools of light)
+mkCandles(-4.5,0,2.5,3);mkCandles(4.5,0,2.5,3);
+mkCandles(-4,0,-3,2);mkCandles(4,0,-3,2);
+mkCandles(-2,.25,5.5,4);mkCandles(2,.25,5.5,3);
+
+// Candle lights
+function addCandleLight(x,y,z,int){const l=new THREE.PointLight(0xffaa44,int||.6,4);l.position.set(x,y+.3,z);scene.add(l);}
+addCandleLight(-4.5,.3,2.5);addCandleLight(4.5,.3,2.5);
+addCandleLight(-4,.3,-3);addCandleLight(4,.3,-3);
+addCandleLight(-2,.5,5.5,.8);addCandleLight(2,.5,5.5,.8);
+
+// ====== WALL TORCHES ======
+function mkTorch(x,y,z,ry){const g=new THREE.Group();
+A(J(new THREE.BoxGeometry(.12,.35,.2,1,2,1),.02),mm(C.ir),0,0,0,0,0,0,0,0,0,g);
+A(new THREE.CylinderGeometry(.04,.06,.6,5),mt(C.wD),0,.4,0,0,0,0,0,0,0,g);
+const f=A(new THREE.SphereGeometry(.1,4,4),glow(0xff9933),0,.8,0,0,0,0,1,1.5,1,g);
+g.position.set(x,y,z);g.rotation.y=ry||0;scene.add(g);
+const tl=new THREE.PointLight(0xff8822,.8,6);tl.position.set(x,y+1,z);scene.add(tl);
+fl.push({flame:f,light:tl,baseIntensity:.8,idx:Math.random()*20});}
+mkTorch(-RW/2+.5,5,-4,Math.PI/2);mkTorch(-RW/2+.5,5,4,Math.PI/2);
+mkTorch(RW/2-.5,5,-4,-Math.PI/2);mkTorch(RW/2-.5,5,4,-Math.PI/2);
+mkTorch(-RW/2+.5,8.5,0,Math.PI/2);mkTorch(RW/2-.5,8.5,0,-Math.PI/2);
+// Additional wall sconces for full illumination
+mkTorch(-RW/2+.5,3,-1,Math.PI/2);mkTorch(-RW/2+.5,3,6,Math.PI/2);
+mkTorch(RW/2-.5,3,-1,-Math.PI/2);mkTorch(RW/2-.5,3,6,-Math.PI/2);
+mkTorch(-RW/2+.5,8.5,-5,Math.PI/2);mkTorch(-RW/2+.5,8.5,5,Math.PI/2);
+mkTorch(RW/2-.5,8.5,-5,-Math.PI/2);mkTorch(RW/2-.5,8.5,5,-Math.PI/2);
+// Back wall sconces
+mkTorch(-3,4,-RD/2+.5,0);mkTorch(3,4,-RD/2+.5,0);
+mkTorch(-6,8.5,-RD/2+.5,0);mkTorch(0,8.5,-RD/2+.5,0);mkTorch(6,8.5,-RD/2+.5,0);
+
+// ====== STAIRS (reaching mezzanine) ======
+{// Right stairs - going up along the back wall
+const stairsR=new THREE.Group();
+const nSteps=Math.ceil(mezH/.35);
+for(let i=0;i<nSteps;i++){
+A(J(new THREE.BoxGeometry(1.3,.2,.6),.02),mt(C.sM),0,i*.35+.1,-i*.5,0,0,0,0,0,0,stairsR);}
+// Railing posts along the stairs
+for(let i=0;i<nSteps;i+=2){
+A(new THREE.BoxGeometry(.08,.8,.08),mt(C.wD),.6,i*.35+.5,-i*.5,0,0,0,0,0,0,stairsR);
+A(new THREE.BoxGeometry(.08,.8,.08),mt(C.wD),-.6,i*.35+.5,-i*.5,0,0,0,0,0,0,stairsR);}
+// Angled railing bars that follow the stair slope
+const stairLen=Math.sqrt((nSteps*.5)*(nSteps*.5)+(nSteps*.35)*(nSteps*.35));
+const stairAngle=Math.atan2(nSteps*.35,nSteps*.5);
+for(let s=-1;s<=1;s+=2){
+const rail=A(new THREE.BoxGeometry(.08,.08,stairLen),mt(C.wL),s*.6,nSteps*.35/2+.5,-nSteps*.5/2+.25,stairAngle,0,0,0,0,0,stairsR);}
+stairsR.position.set(RW/2-2.5,0,RD/2-1);scene.add(stairsR);
+
+// Left stairs
+const stairsL=new THREE.Group();
+for(let i=0;i<nSteps;i++){
+A(J(new THREE.BoxGeometry(1.3,.2,.6),.02),mt(C.sM),0,i*.35+.1,-i*.5,0,0,0,0,0,0,stairsL);}
+for(let i=0;i<nSteps;i+=2){
+A(new THREE.BoxGeometry(.08,.8,.08),mt(C.wD),.6,i*.35+.5,-i*.5,0,0,0,0,0,0,stairsL);
+A(new THREE.BoxGeometry(.08,.8,.08),mt(C.wD),-.6,i*.35+.5,-i*.5,0,0,0,0,0,0,stairsL);}
+for(let s=-1;s<=1;s+=2){
+A(new THREE.BoxGeometry(.08,.08,stairLen),mt(C.wL),s*.6,nSteps*.35/2+.5,-nSteps*.5/2+.25,stairAngle,0,0,0,0,0,stairsL);}
+stairsL.position.set(-RW/2+2.5,0,RD/2-1);scene.add(stairsL);}
+
+// ====== AMBIENT LIGHTING ======
+scene.add(new THREE.AmbientLight(0x1a1520,.35));
+// Warm overhead
+const oh=new THREE.PointLight(0xffaa55,1,18);oh.position.set(0,RH-1,0);scene.add(oh);
+// Side warm fills
+const sf1=new THREE.PointLight(0xff8844,.6,10);sf1.position.set(-6,3,0);scene.add(sf1);
+const sf2=new THREE.PointLight(0xff8844,.6,10);sf2.position.set(6,3,0);scene.add(sf2);
+// Cool fill from above for contrast
+const cool=new THREE.DirectionalLight(0x3344aa,.15);cool.position.set(0,12,0);scene.add(cool);
+// Crystal uplighting
+const upL=new THREE.PointLight(0x66aaff,2.5,10);upL.position.set(0,1,0);scene.add(upL);
+fl.push({light:upL,baseIntensity:1.5,idx:105});
+
+// ====== SLOT MARKERS ======
+const slotPositions = [
+  [0, 4.5, 4],
+  [-6, 8.5, 2],
+  [6, 8.5, 2],
+  [-2.5, 2.5, 4],
+  [2.5, 2.5, 4]
+];
+
+const markerMat = new THREE.MeshBasicMaterial({color: 0xff00ff, transparent: true, opacity: 0.7});
+const markerGeo = new THREE.SphereGeometry(0.35, 12, 8);
+
+slotPositions.forEach(function(pos, idx) {
+  // Magenta sphere marker
+  const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(pos[0], pos[1], pos[2]);
+  scene.add(marker);
+
+  // Sprite label with number
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ff00ff';
+  ctx.font = 'bold 48px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(idx), 32, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({map: tex, transparent: true});
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.position.set(pos[0], pos[1] + 0.7, pos[2]);
+  sprite.scale.set(0.8, 0.8, 1);
+  scene.add(sprite);
+});
+
+// ====== SLOTS PANEL ======
+const slotsPanel = document.getElementById('slots-panel');
+slotPositions.forEach(function(pos, idx) {
+  const div = document.createElement('div');
+  div.textContent = 'Slot ' + idx + ': [' + pos.join(', ') + ']';
+  div.addEventListener('click', function() {
+    controls.target.set(pos[0], pos[1], pos[2]);
+  });
+  slotsPanel.appendChild(div);
+});
+
+// ====== COPY KEYFRAME ======
+function copyKeyframe() {
+  const p = camera.position;
+  const t = controls.target;
+  const text = '{ pos: [' +
+    p.x.toFixed(2) + ', ' + p.y.toFixed(2) + ', ' + p.z.toFixed(2) +
+    '], target: [' +
+    t.x.toFixed(2) + ', ' + t.y.toFixed(2) + ', ' + t.z.toFixed(2) +
+    '] }';
+  navigator.clipboard.writeText(text);
+  const el = document.getElementById('copied');
+  el.style.opacity = '1';
+  setTimeout(function() { el.style.opacity = '0'; }, 1200);
+}
+window.copyKeyframe = copyKeyframe;
+
+// ====== ANIMATE ======
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();
+// Crystal rotation + pulse
+crys.rotation.y=t*.3;crys.rotation.x=Math.sin(t*.5)*.1;
+crystInner.rotation.y=-t*.5;crystInner.rotation.z=t*.2;
+crystCore.rotation.y=t*.4;crystCore.rotation.z=Math.sin(t*.7)*.08;
+const pulse=.7+Math.sin(t*2)*.3;
+crys.material.emissiveIntensity=1.6+pulse*.8;
+crystInner.material.opacity=.6+pulse*.2;
+crystCore.material.opacity=.88+pulse*.1;
+crystHot.scale.setScalar(.9+pulse*.15);
+crystLight.intensity=4.5+pulse*2.5;
+crystLight2.intensity=2+pulse*1.5;
+// Flicker
+fl.forEach(f=>{const n=f.idx||0;
+if(f.light){const b=f.baseIntensity||1;f.light.intensity=b+Math.sin(t*7+n)*b*.18+Math.sin(t*13+n*2)*b*.12;}
+if(f.flame){f.flame.scale.y=1.5+Math.sin(t*9+n)*.4;f.flame.scale.x=1+Math.sin(t*7+n*3)*.2;}});
+// Update controls
+controls.update();
+// Update HUD
+document.getElementById('px').textContent = camera.position.x.toFixed(2);
+document.getElementById('py').textContent = camera.position.y.toFixed(2);
+document.getElementById('pz').textContent = camera.position.z.toFixed(2);
+document.getElementById('tx').textContent = controls.target.x.toFixed(2);
+document.getElementById('ty').textContent = controls.target.y.toFixed(2);
+document.getElementById('tz').textContent = controls.target.z.toFixed(2);
+R.render(scene,camera);}
+animate();
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();R.setSize(innerWidth,innerHeight);});
+</script>
+</body>
+</html>
