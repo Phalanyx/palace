@@ -1,6 +1,9 @@
+"use client"
+
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { User } from "@supabase/supabase-js"
-import { CastleIcon, CompassIcon, SparklesIcon } from "lucide-react"
+import { CircleHelpIcon, LayoutGridIcon } from "lucide-react"
 
 import { UserDropdown } from "@/components/user-dropdown"
 import { Button } from "@/components/ui/button"
@@ -10,54 +13,92 @@ interface MarketingHeaderProps {
 }
 
 const navItems = [
-  { href: "/#how-it-works", label: "How it works", icon: CompassIcon },
-  { href: "/#highlights", label: "Highlights", icon: SparklesIcon },
+  { value: "how-it-works", href: "/#how-it-works", label: "How it works", icon: CircleHelpIcon },
+  { value: "highlights", href: "/#highlights", label: "Highlights", icon: LayoutGridIcon },
 ]
 
 export function MarketingHeader({ user }: MarketingHeaderProps) {
-  return (
-    <header className="sticky top-0 z-40 border-b border-[color:var(--landing-line)] bg-[color:color-mix(in_srgb,var(--landing-footer-bg)_82%,transparent)] backdrop-blur-2xl">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3 transition-transform hover:-translate-y-0.5">
-          <div className="flex size-11 items-center justify-center rounded-[1.35rem] border border-[color:var(--landing-line)] bg-[color:var(--landing-pill-bg)] text-primary shadow-lg shadow-black/10 dark:shadow-black/20">
-            <CastleIcon className="size-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-[family-name:var(--font-baloo)] text-2xl leading-none text-[color:var(--landing-text)]">
-              Palace
-            </span>
-            <span className="hidden text-xs text-[color:var(--landing-text-soft)] sm:block">
-              Study worlds with sticky recall
-            </span>
-          </div>
-        </Link>
+  const [activeNavTab, setActiveNavTab] = useState(navItems[0].value)
 
-        <nav className="hidden items-center gap-2 md:flex">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Button
-              key={label}
-              variant="ghost"
-              asChild
-              className="rounded-full px-3 text-sm text-[color:var(--landing-text-soft)] hover:bg-[color:var(--landing-pill-bg)] hover:text-[color:var(--landing-text)]"
-            >
-              <a href={href}>
-              <Icon className="size-4 text-primary/70" />
-              {label}
-              </a>
-            </Button>
-          ))}
+  useEffect(() => {
+    const syncActiveTab = () => {
+      const hash = window.location.hash.replace("#", "")
+      const matchingTab = navItems.find(({ value }) => value === hash)
+      setActiveNavTab(matchingTab?.value ?? navItems[0].value)
+    }
+
+    syncActiveTab()
+    window.addEventListener("hashchange", syncActiveTab)
+
+    return () => window.removeEventListener("hashchange", syncActiveTab)
+  }, [])
+
+  function handleNavChange(value: string) {
+    const section = document.getElementById(value)
+
+    if (!section) {
+      window.location.assign(`/#${value}`)
+      return
+    }
+
+    setActiveNavTab(value)
+    section.scrollIntoView({ behavior: "smooth", block: "start" })
+    window.history.replaceState(null, "", `/#${value}`)
+  }
+
+  return (
+    <header className="sticky top-0 z-40 px-4 pt-4 sm:px-6 lg:px-8">
+      <div className="dashboard-header-shell mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center">
+          <Link href="/" className="dashboard-brand-lockup transition-transform hover:-translate-y-0.5">
+            <div className="dashboard-brand-mark">
+              <span className="dark:hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/palace_logo_black.png" alt="Palace" className="h-12 w-auto sm:h-14" />
+              </span>
+              <span className="hidden dark:inline">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/palace_logo.png" alt="Palace" className="h-12 w-auto sm:h-14" />
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        <nav
+          aria-label="Landing page navigation"
+          className="dashboard-nav hidden items-center gap-1 md:flex"
+        >
+          {navItems.map(({ value, label, icon: Icon }) => {
+            const isActive = value === activeNavTab
+
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => handleNavChange(value)}
+                aria-current={isActive ? "page" : undefined}
+                className={[
+                  "dashboard-nav-button flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium transition-all duration-200",
+                  isActive ? "dashboard-nav-button-active" : "dashboard-nav-button-idle",
+                ].join(" ")}
+              >
+                <Icon className="size-4" />
+                <span>{label}</span>
+              </button>
+            )
+          })}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
           {user ? (
             <>
               <Button
                 variant="outline"
                 asChild
-                className="hidden rounded-full border-[color:var(--landing-line)] bg-[color:var(--landing-pill-bg)] px-4 text-[color:var(--landing-text)] hover:bg-[color:color-mix(in_srgb,var(--landing-pill-bg)_84%,var(--landing-text)_8%)] hover:text-[color:var(--landing-text)] sm:inline-flex"
+                className="dashboard-pill hidden rounded-xl px-4 text-sm font-medium text-[color:var(--dashboard-text)] transition-all duration-200 hover:bg-[color:color-mix(in_srgb,var(--dashboard-surface-strong)_90%,transparent)] hover:text-[color:var(--dashboard-text)] sm:inline-flex"
               >
                 <Link href="/dashboard">
-                My Memory Palaces
+                  My Memory Palaces
                 </Link>
               </Button>
               <UserDropdown user={user} />
@@ -67,23 +108,45 @@ export function MarketingHeader({ user }: MarketingHeaderProps) {
               <Button
                 variant="ghost"
                 asChild
-                className="rounded-full text-[color:var(--landing-text-soft)] hover:bg-[color:var(--landing-pill-bg)] hover:text-[color:var(--landing-text)]"
+                className="dashboard-nav-button dashboard-nav-button-idle rounded-xl px-4 text-sm font-medium"
               >
                 <Link href="/login">
-                Log in
+                  Log in
                 </Link>
               </Button>
               <Button
                 asChild
-                className="rounded-full bg-primary px-4 text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
+                className="dashboard-nav-button-active rounded-xl px-4 text-sm font-medium text-[color:var(--dashboard-text)] shadow-lg shadow-primary/15"
               >
                 <Link href="/signup">
-                Start building
+                  Start building
                 </Link>
               </Button>
             </>
           )}
         </div>
+      </div>
+
+      <div className="mx-auto flex max-w-7xl gap-2 px-4 pb-3 md:hidden sm:px-6 lg:px-8">
+        {navItems.map(({ value, label, icon: Icon }) => {
+          const isActive = value === activeNavTab
+
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => handleNavChange(value)}
+              aria-current={isActive ? "page" : undefined}
+              className={[
+                "dashboard-nav-button flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-200",
+                isActive ? "dashboard-nav-button-active" : "dashboard-nav-button-idle",
+              ].join(" ")}
+            >
+              <Icon className="size-3.5 shrink-0" />
+              <span className="truncate">{label}</span>
+            </button>
+          )
+        })}
       </div>
     </header>
   )

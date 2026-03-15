@@ -8,7 +8,7 @@ export default async function DashboardPage() {
   const user = await requireUser()
 
   const palaces = await prisma.palace.findMany({
-    where: { userId: "test-user-id" },
+    where: { userId: user.id },
     include: {
       _count: {
         select: { rooms: true },

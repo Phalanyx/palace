@@ -93,7 +93,7 @@ export function LandingPageClient({ user }: { user: User | null }) {
 
         <main className="flex-1">
           <section className="mx-auto flex min-h-[calc(100vh-4.5rem)] w-full max-w-7xl flex-col justify-center px-4 pb-20 pt-16 sm:px-6 lg:px-8">
-            <div className="grid items-end gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)]">
+            <div className="grid gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)] lg:items-center">
               <div className="max-w-3xl">
                 <div className="landing-kicker">
                   <SparklesIcon className="size-4" />
@@ -126,7 +126,7 @@ export function LandingPageClient({ user }: { user: User | null }) {
                 </div>
               </div>
 
-              <div className="landing-hero-card">
+              <div className="landing-hero-card landing-hero-card-primary">
                 <div className="landing-hero-copy">
                   <span className="landing-hero-label">Try the flow</span>
                   <h2>Describe a topic and Palace will scaffold the first memory route.</h2>
@@ -141,7 +141,7 @@ export function LandingPageClient({ user }: { user: User | null }) {
                   />
 
                   <div className="landing-composer-footer">
-                    <div className="landing-composer-meta">
+                    <div className="landing-composer-actions">
                       <label className="landing-attachment-pill">
                         <PaperclipIcon className="size-4" />
                         <span>
@@ -159,31 +159,31 @@ export function LandingPageClient({ user }: { user: User | null }) {
                           }
                         />
                       </label>
-
-                      <p className="landing-composer-hint">
-                        {user
-                          ? "Signed in: submit now and jump straight into the dashboard."
-                          : "Signed out: we’ll save this prompt and attachments, ask you to log in, then continue automatically."}
-                      </p>
+                      <Button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!prompt.trim() || isSubmitting}
+                        className="landing-composer-button rounded-full px-5"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                            Building
+                          </>
+                        ) : (
+                          <>
+                            Create palace
+                            <ArrowRightIcon data-icon="inline-end" />
+                          </>
+                        )}
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={handleSubmit}
-                      disabled={!prompt.trim() || isSubmitting}
-                      className="landing-composer-button rounded-full px-5"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
-                          Building
-                        </>
-                      ) : (
-                        <>
-                          Create palace
-                          <ArrowRightIcon data-icon="inline-end" />
-                        </>
-                      )}
-                    </Button>
+
+                    <p className="landing-composer-hint">
+                      {user
+                        ? "Signed in: submit now and jump straight into the dashboard."
+                        : "Signed out: we’ll save this prompt and attachments, ask you to log in, then continue automatically."}
+                    </p>
                   </div>
                 </div>
 

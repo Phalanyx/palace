@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, Paperclip, Home, FolderOpen, BookOpen } from "lucide-react"
+import { RotateCw, Trash2, ArrowRight, Lock, ArrowUp, Search, Paperclip, Home, FolderOpen, BookOpen, ChartSpline } from "lucide-react"
 import Link from "next/link"
 import { User } from "@supabase/supabase-js"
 import { Avatar, AvatarFallback } from "@/components/ui/glass/avatar"
@@ -115,7 +115,7 @@ function PalaceCard({ palace }: { palace: Palace }) {
             <Lock className="glass-text-soft h-4 w-4" />
           </div>
         ) : (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {score !== undefined ? (
                 <>
@@ -132,9 +132,18 @@ function PalaceCard({ palace }: { palace: Palace }) {
                 </div>
               )}
             </div>
-            <Link href={`/palace/${palace.id}`} className="glass-pill glass-interactive glass-text-muted flex h-8 w-8 items-center justify-center rounded-full hover:text-foreground">
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/palace/${palace.id}/history`}
+                className="dashboard-pill inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-colors hover:text-foreground"
+              >
+                <ChartSpline className="h-3.5 w-3.5" />
+                <span>View progress</span>
+              </Link>
+              <Link href={`/palace/${palace.id}`} className="glass-pill glass-interactive glass-text-muted flex h-8 w-8 items-center justify-center rounded-full hover:text-foreground">
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         )}
       </div>
